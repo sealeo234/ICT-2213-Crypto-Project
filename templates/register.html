@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="max-w-md mx-auto mt-20">
+    <div class="glass-card p-10">
+        <header class="mb-8">
+            <h2 class="text-3xl font-bold mb-2">Initialize Account</h2>
+            <p class="text-slate-400 text-sm leading-relaxed">
+                Create your unique identity key to start sharing files securely.
+            </p>
+        </header>
+        
+        <form method="POST" class="flex flex-col gap-6">
+            <div class="flex flex-col gap-2">
+                <label class="text-xs uppercase tracking-widest font-bold text-slate-500">Choose Username</label>
+                <input type="text" name="username" placeholder="e.g. neuro_mancer" required 
+                       class="transition-all duration-200">
+            </div>
+
+            <div class="flex flex-col gap-2">
+                <label class="text-xs uppercase tracking-widest font-bold text-slate-500">Security Password</label>
+                <input type="password" name="password" placeholder="••••••••" required
+                       class="transition-all duration-200">
+                <p class="text-[10px] text-slate-500 mt-1 italic">
+                    Use at least 12 characters with symbols for maximum entropy.
+                </p>
+            </div>
+
+            <div class="mt-4">
+                <button type="submit" class="btn-primary w-full">
+                    Generate Vault Access
+                </button>
+            </div>
+        </form>
+        
+        <footer class="mt-8 pt-6 border-t border-slate-800/50 text-center">
+            <p class="text-sm text-slate-500">
+                Already have an access key? 
+                <a href="/login" class="text-blue-400 hover:text-blue-300 font-medium transition">Authenticate</a>
+            </p>
+        </footer>
+    </div>
+</div>
+{% endblock %}

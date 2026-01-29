@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SecureShare | Enterprise Encryption</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body class="flex flex-col min-vh-100">
+    <nav class="flex justify-between items-center py-6 px-12 border-b border-slate-800/50 backdrop-blur-md sticky top-0 z-50">
+        <a href="/" class="text-xl font-bold tracking-widest uppercase">
+            Secure<span class="text-blue-500">Share</span>
+        </a>
+        <div class="space-x-8 flex items-center">
+            {% if current_user.is_authenticated %}
+                <span class="text-slate-400 text-sm">Key ID: {{ current_user.username }}</span>
+                <a href="/logout" class="text-sm hover:text-blue-400 transition">Terminate Session</a>
+            {% else %}
+                <a href="/login" class="text-sm font-medium hover:text-blue-400 transition">Login</a>
+                <a href="/register" class="btn-primary text-sm">Create Vault</a>
+            {% endif %}
+        </div>
+    </nav>
+
+    <div class="container mx-auto px-6 flex-grow">
+        {% with messages = get_flashed_messages() %}
+          {% if messages %}
+            {% for message in messages %}
+              <div class="flash-message bg-blue-500/20 border border-blue-500 text-blue-200 p-4 rounded-lg mt-4 transition-opacity duration-500">
+                {{ message }}
+              </div>
+            {% endfor %}
+          {% endif %}
+        {% endwith %}
+
+        {% block content %}{% endblock %}
+    </div>
+
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>

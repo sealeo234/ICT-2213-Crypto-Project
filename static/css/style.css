@@ -1,0 +1,229 @@
+/* SECURESHARE | PROFESSIONAL STYLESHEET
+    Theme: Deep Space / Electric Blue
+*/
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap');
+
+:root {
+    /* Color Palette */
+    --bg-dark: #020617;
+    --bg-gradient: radial-gradient(circle at 50% -20%, #1e293b 0%, #020617 100%);
+    --card-bg: rgba(15, 23, 42, 0.6);
+    --accent-blue: #3b82f6;
+    --accent-blue-glow: rgba(59, 130, 246, 0.4);
+    --accent-blue-hover: #60a5fa;
+    
+    /* Text Colors */
+    --text-primary: #f8fafc;
+    --text-secondary: #94a3b8;
+    --text-muted: #64748b;
+    
+    /* Borders & UI */
+    --border-glass: rgba(255, 255, 255, 0.08);
+    --border-focus: rgba(59, 130, 246, 0.5);
+    --transition-speed: 0.3s;
+}
+
+/* --- Global Resets --- */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    background: var(--bg-dark);
+    background-image: var(--bg-gradient);
+    color: var(--text-primary);
+    font-family: 'Inter', sans-serif;
+    line-height: 1.6;
+    min-height: 100vh;
+    overflow-x: hidden;
+}
+
+/* --- Layout Components --- */
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 2rem;
+}
+
+/* --- Glassmorphism UI --- */
+.glass-card {
+    background: var(--card-bg);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid var(--border-glass);
+    border-radius: 24px;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+    transition: transform var(--transition-speed) ease, border-color var(--transition-speed) ease;
+}
+
+.glass-card:hover {
+    border-color: rgba(59, 130, 246, 0.2);
+}
+
+/* --- Navigation --- */
+nav {
+    border-bottom: 1px solid var(--border-glass);
+    background: rgba(2, 6, 23, 0.8);
+    backdrop-filter: blur(8px);
+    height: 80px;
+    display: flex;
+    align-items: center;
+}
+
+.nav-brand {
+    font-size: 1.25rem;
+    font-weight: 800;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    text-decoration: none;
+    color: var(--text-primary);
+}
+
+.nav-brand span {
+    color: var(--accent-blue);
+    text-shadow: 0 0 10px var(--accent-blue-glow);
+}
+
+/* --- Form Elements --- */
+.form-group {
+    margin-bottom: 1.5rem;
+}
+
+label {
+    display: block;
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-secondary);
+    margin-bottom: 0.5rem;
+}
+
+input[type="text"],
+input[type="password"],
+input[type="email"] {
+    width: 100%;
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid var(--border-glass);
+    border-radius: 12px;
+    padding: 14px 18px;
+    color: white;
+    font-size: 1rem;
+    transition: all var(--transition-speed) cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+input:focus {
+    outline: none;
+    border-color: var(--accent-blue);
+    background: rgba(0, 0, 0, 0.5);
+    box-shadow: 0 0 0 4px var(--accent-blue-glow);
+}
+
+/* --- Interactive Buttons --- */
+.btn-primary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--accent-blue);
+    color: white;
+    font-weight: 600;
+    padding: 14px 28px;
+    border-radius: 12px;
+    border: none;
+    cursor: pointer;
+    text-decoration: none;
+    transition: all var(--transition-speed) ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.btn-primary:hover {
+    background: var(--accent-blue-hover);
+    transform: translateY(-2px);
+    box-shadow: 0 10px 20px -5px var(--accent-blue-glow);
+}
+
+.btn-primary::after {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: linear-gradient(45deg, transparent, rgba(255,255,255,0.1), transparent);
+    transform: rotate(45deg);
+    transition: 0.8s;
+}
+
+.btn-primary:hover::after {
+    left: 120%;
+}
+
+/* --- Dropzone / File Upload --- */
+.dropzone {
+    border: 2px dashed var(--border-glass);
+    padding: 4rem 2rem;
+    text-align: center;
+    border-radius: 20px;
+    cursor: pointer;
+    transition: all var(--transition-speed) ease;
+}
+
+.dropzone:hover {
+    border-color: var(--accent-blue);
+    background: rgba(59, 130, 246, 0.03);
+}
+
+.dropzone-icon {
+    font-size: 3rem;
+    color: var(--accent-blue);
+    margin-bottom: 1rem;
+    opacity: 0.8;
+}
+
+/* --- Alerts & Messages --- */
+.flash-message {
+    background: rgba(59, 130, 246, 0.1);
+    border-left: 4px solid var(--accent-blue);
+    color: var(--text-primary);
+    padding: 1rem;
+    border-radius: 8px;
+    margin-bottom: 1.5rem;
+    animation: fadeIn 0.4s ease-out;
+}
+
+/* --- Animations --- */
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideUp {
+    from { opacity: 0; transform: translateY(30px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-slide-up {
+    animation: slideUp 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* --- Custom Scrollbar --- */
+::-webkit-scrollbar {
+    width: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--bg-dark);
+}
+
+::-webkit-scrollbar-thumb {
+    background: #1e293b;
+    border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--accent-blue);
+}
