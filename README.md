@@ -35,5 +35,5 @@ Current progress:
 
 Additional Notes:
 
-* Uploading large files may cause the app to fail (for now)
+* Note that large files may take a while to encrypt/decrypt
 * All encryption/decryption logic are at the browser extension's JS files

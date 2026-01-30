@@ -3,7 +3,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const fileInput = document.getElementById('file-input');
     const selectBtn = document.getElementById('select-btn');
     const uploadForm = document.getElementById('upload-form');
-    const EXTENSION_ID = "igjjekfjfleoeifbaodgfmadfnegdedp";
 
     // --- 1. Vault Key Sync Watcher ---
     const body = document.body;
@@ -27,11 +26,20 @@ document.addEventListener('DOMContentLoaded', () => {
         setInterval(pollServer, 2000);
     }
 
-    // --- 2. Centralized Upload Logic (ID-Agnostic Bridge) ---
+    // --- 2. Centralized Upload Logic (ID-Agnostic + Stack-Safe) ---
     const handleUpload = async () => {
         const file = fileInput.files[0];
         const recipientKey = document.body.getAttribute('data-public-key');
         
+        // Check if the key exists and isn't just a placeholder like "None" or ""
+        if (!recipientKey || recipientKey === "None" || recipientKey === "") {
+            alert("No encryption key found.\n\nPlease open the Secure Vault Extension and click 'Generate/Sync Keys' before uploading.");
+            
+            // Reset the file input so they can try again after syncing
+            fileInput.value = ""; 
+            return;
+        }
+
         if (!file) return;
         
         if (!recipientKey) {
@@ -44,35 +52,37 @@ document.addEventListener('DOMContentLoaded', () => {
             selectBtn.disabled = true;
         }
 
-        try {
-            // Read file into an ArrayBuffer then to a Byte Array
-            const arrayBuffer = await file.arrayBuffer();
-            const bytes = Array.from(new Uint8Array(arrayBuffer));
+        // Use FileReader to get Base64 - This avoids "Maximum call stack size exceeded"
+        const reader = new FileReader();
+        
+        reader.onload = async () => {
+            // result is "data:application/octet-stream;base64,XXXXX..."
+            // We only want the part after the comma
+            const base64String = reader.result.split(',')[1];
 
-            /**
-             * NEW: Instead of chrome.runtime.sendMessage(ID), 
-             * we dispatch a CustomEvent. content.js will catch this.
-             */
-            
             // A. Create the listener for the response from the extension
             const onResponse = async (event) => {
                 const response = event.detail;
                 window.removeEventListener("VAULT_ENCRYPT_RESPONSE", onResponse);
-
+            
                 if (!response || response.error) {
-                    alert("Encryption failed: " + (response?.error || "Extension not responding"));
+                    alert("Encryption failed.");
                     resetUI();
                     return;
                 }
-
-                // B. Proceed with JSON upload to Flask
+            
+                // Prepare the final payload for the server
+                const finalPayload = response.encryptedPayload;
+                
+                finalPayload.originalName = file.name; 
+            
                 try {
                     const uploadRes = await fetch('/upload', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
-                            filename: file.name + ".json",
-                            payload: response.encryptedPayload
+                            filename: file.name + ".json", // The server sees the .json file
+                            payload: finalPayload          // The JSON inside contains the original name
                         })
                     });
 
@@ -91,18 +101,22 @@ document.addEventListener('DOMContentLoaded', () => {
 
             window.addEventListener("VAULT_ENCRYPT_RESPONSE", onResponse);
 
-            // C. Dispatch the encryption request
+            // C. Dispatch the encryption request using Base64 string instead of byte array
             window.dispatchEvent(new CustomEvent("VAULT_ENCRYPT_REQUEST", {
                 detail: { 
-                    plaintext: bytes, 
+                    plaintextB64: base64String, 
                     recipientPublicKey: recipientKey 
                 }
             }));
+        };
 
-        } catch (e) {
-            console.error("File reading error:", e);
+        reader.onerror = (err) => {
+            console.error("FileReader error:", err);
+            alert("Failed to read file.");
             resetUI();
-        }
+        };
+
+        reader.readAsDataURL(file);
     };
 
     const resetUI = () => {
@@ -112,21 +126,14 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    // --- 3. Page Aesthetics and Event Listeners ---
+    // --- 3. UI Interaction Listeners ---
     if (selectBtn && fileInput && uploadForm) {
-        
-        selectBtn.addEventListener('click', () => {
-            fileInput.click();
-        });
+        selectBtn.addEventListener('click', () => fileInput.click());
 
-        // Intercept change event
         fileInput.addEventListener('change', () => {
-            if (fileInput.files.length > 0) {
-                handleUpload(); 
-            }
+            if (fileInput.files.length > 0) handleUpload(); 
         });
 
-        // Drag & Drop
         ['dragenter', 'dragover'].forEach(eventName => {
             dropzone.addEventListener(eventName, (e) => {
                 e.preventDefault();
@@ -150,7 +157,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
 
-        // Prevent traditional form submission
         uploadForm.addEventListener('submit', (e) => {
             e.preventDefault();
             handleUpload();
