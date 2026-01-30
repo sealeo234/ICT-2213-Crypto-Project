@@ -3,14 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SecureShare | Enterprise Encryption</title>
+    <title>VaulnZero | Enterprise Encryption</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
-<body class="flex flex-col min-vh-100">
+<body class="flex flex-col min-vh-100"
+data-authenticated="{{ 'true' if current_user.is_authenticated else 'false' }}" 
+data-has-key="{{ 'true' if current_user.public_key else 'false' }}"
+data-public-key="{{ current_user.public_key }}"
+>
     <nav class="flex justify-between items-center py-6 px-12 border-b border-slate-800/50 backdrop-blur-md sticky top-0 z-50">
         <a href="/" class="text-xl font-bold tracking-widest uppercase">
-            Secure<span class="text-blue-500">Share</span>
+            Vauln<span class="text-blue-500">Zero</span>
         </a>
         <div class="space-x-8 flex items-center">
             {% if current_user.is_authenticated %}
@@ -18,7 +22,7 @@
                 <a href="/logout" class="text-sm hover:text-blue-400 transition">Terminate Session</a>
             {% else %}
                 <a href="/login" class="text-sm font-medium hover:text-blue-400 transition">Login</a>
-                <a href="/register" class="btn-primary text-sm">Create Vault</a>
+                <a href="/register" class="btn-primary text-sm">Create Account</a>
             {% endif %}
         </div>
     </nav>

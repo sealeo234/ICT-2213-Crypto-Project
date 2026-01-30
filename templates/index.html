@@ -4,10 +4,10 @@
     
     <div class="text-center mb-16">
         <h1 class="text-6xl font-extrabold mb-4 tracking-tight">
-            Data <span class="text-blue-500">Vault.</span>
+            Vaulnerableless <span class="text-blue-500">Vault.</span>
         </h1>
         <p class="text-slate-400 text-lg max-w-xl mx-auto">
-            Securely upload, store, and manage your encrypted assets with military-grade ephemeral storage.
+            Securely upload, store, and share your encrypted assets.
         </p>
     </div>
 
@@ -15,6 +15,34 @@
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
         
         <div class="lg:col-span-1">
+            <div class="glass-card p-6 mb-6 border-blue-500/30 bg-blue-500/5">
+                <h4 class="text-[10px] uppercase tracking-[0.2em] text-blue-400 font-bold mb-4">Cryptographic Identity</h4>
+                <div class="flex items-center mb-4">
+                    <div class="relative flex h-3 w-3 mr-3">
+                        {% if current_user.public_key %}
+                            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                            <span class="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
+                        {% else %}
+                            <span class="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+                        {% endif %}
+                    </div>
+                    <span class="text-sm font-medium text-slate-200">
+                        {{ 'Extension Linked' if current_user.public_key else 'Key Pair Required' }}
+                    </span>
+                </div>
+                
+                {% if current_user.public_key %}
+                <div class="bg-black/40 rounded-lg p-3 border border-white/5">
+                    <p class="text-[9px] text-slate-500 uppercase mb-1 font-bold">Active Public Key</p>
+                    <p class="text-[10px] font-mono text-blue-300 break-all leading-relaxed">
+                        {{ current_user.public_key }}
+                    </p>
+                </div>
+                {% else %}
+                <p class="text-xs text-slate-500 italic">Use your browser extension to generate and sync your vault keys.</p>
+                {% endif %}
+            </div>
+
             <div class="glass-card p-8 sticky top-24">
                 <h3 class="text-xl font-bold mb-6 flex items-center">
                     <span class="w-2 h-6 bg-blue-500 rounded-full mr-3"></span>
@@ -94,12 +122,12 @@
     {% else %}
     <div class="text-center mt-12">
         <div class="glass-card inline-block p-2 rounded-full mb-8 border-blue-500/20">
-            <span class="px-4 py-1 bg-blue-500 rounded-full text-xs font-bold uppercase tracking-widest">New</span>
-            <span class="px-4 text-xs text-slate-400">Quantum-resistant encryption now active</span>
+            <span class="px-4 py-1 bg-blue-500 rounded-full text-xs font-bold uppercase tracking-widest">File Share</span>
+            <span class="px-4 text-xs text-slate-400">Encryption-Based Access Control</span>
         </div>
         <div class="flex justify-center gap-6">
-            <a href="/register" class="btn-primary px-10 py-4 text-lg">Initialize Vault</a>
-            <a href="/login" class="px-10 py-4 text-lg border border-slate-700 rounded-xl hover:bg-slate-800 transition">Access Key</a>
+            <a href="/download/extension" class="btn-primary px-10 py-4 text-lg">Download VaulnZero Client</a>
+            <a href="/login" class="px-10 py-4 text-lg border border-slate-700 rounded-xl hover:bg-slate-800 transition">Vault Access</a>
         </div>
     </div>
     {% endif %}
