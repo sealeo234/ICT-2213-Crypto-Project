@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="max-w-4xl mx-auto py-12 animate-slide-up">
+
+    <div class="glass-card p-8">
+
+        <!-- Header -->
+        <div class="mb-8">
+            <h2 class="text-2xl font-bold flex items-center">
+                <span class="w-2 h-6 bg-yellow-400 rounded-full mr-3"></span>
+                Edit File Access
+            </h2>
+            <p class="text-sm text-slate-400 mt-2">
+                Control who can decrypt and access this asset.
+            </p>
+        </div>
+
+        <!-- File Info -->
+        <div class="mb-8 bg-black/40 rounded-xl p-4">
+            <p class="text-xs uppercase tracking-widest text-slate-500 mb-1">
+                Protected Asset
+            </p>
+            <div class="font-mono text-slate-200 break-all">
+                {{ file.filename }}
+            </div>
+        </div>
+
+        <!-- Access Form -->
+        <form method="POST" data-edit-access data-file-id="{{ file.id }}">
+
+            <div class="space-y-4 mb-10">
+
+                {% for user in all_users %}
+                <label class="flex items-center justify-between p-4 rounded-xl bg-white/5 hover:bg-white/10 transition cursor-pointer">
+
+                    <div>
+                        <p class="font-medium text-slate-300">
+                            {{ user.username }}
+                        </p>
+                        <p class="text-xs text-slate-500 font-mono">
+                            {{ user.uuid }}
+                        </p>
+                    </div>
+
+                    <div>
+                        <input type="checkbox"
+                               name="recipients"
+                               value="{{ user.uuid }}"
+                               {% if user.uuid in current_access_uuids %}checked{% endif %}
+                               class="w-5 h-5 accent-yellow-400 cursor-pointer">
+                    </div>
+
+                </label>
+                {% endfor %}
+
+                {% if all_users|length == 0 %}
+                <div class="text-sm text-slate-500 italic">
+                    No other users available.
+                </div>
+                {% endif %}
+
+            </div>
+
+            <!-- Actions -->
+            <div class="flex justify-between items-center pt-6 border-t border-slate-800">
+
+                <a href="{{ url_for('index') }}"
+                   class="text-slate-400 hover:text-slate-200 transition">
+                    ← Back to Vault
+                </a>
+
+                <button type="submit"
+                        class="btn-primary px-8 py-3">
+                    Save Access Changes
+                </button>
+
+            </div>
+
+        </form>
+
+    </div>
+
+</div>
+
+{% endblock %}

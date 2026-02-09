@@ -6,12 +6,15 @@
     <title>VaulnZero | Enterprise Encryption</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+
+    {% if current_user.is_authenticated %}
+    <!-- UUID and public key for client-side encryption -->
+    <meta name="user-uuid" content="{{ current_user.uuid }}">
+    <meta name="user-public-key" content="{{ current_user.public_key }}">
+    {% endif %}
 </head>
-<body class="flex flex-col min-vh-100"
-data-authenticated="{{ 'true' if current_user.is_authenticated else 'false' }}" 
-data-has-key="{{ 'true' if current_user.public_key else 'false' }}"
-data-public-key="{{ current_user.public_key }}"
->
+
+<body class="flex flex-col min-vh-100">
     <nav class="flex justify-between items-center py-6 px-12 border-b border-slate-800/50 backdrop-blur-md sticky top-0 z-50">
         <a href="/" class="text-xl font-bold tracking-widest uppercase">
             Vauln<span class="text-blue-500">Zero</span>
@@ -41,6 +44,71 @@ data-public-key="{{ current_user.public_key }}"
         {% block content %}{% endblock %}
     </div>
 
+    <!-- Alert Modal -->
+    <div id="alert-modal" class="hidden fixed inset-0 flex items-center justify-center z-50">
+        <div id="alert-overlay" class="absolute inset-0 bg-black/50"></div>
+        <div id="alert-box" class="relative bg-[#1e1e2f] text-white p-6 rounded-lg max-w-md w-11/12 border-2">
+            <h3 id="alert-title" class="text-lg font-bold mb-2"></h3>
+            <p id="alert-message" class="text-sm text-slate-300"></p>
+            <button id="alert-close" class="mt-4 px-4 py-2 rounded bg-blue-500 text-black font-bold">OK</button>
+        </div>
+    </div>
+
+    <!-- Password Modal -->
+    <div id="password-modal" class="hidden fixed inset-0 flex items-center justify-center z-50">
+        <div class="absolute inset-0 bg-black/50"></div>
+        <div class="relative bg-[#1e1e2f] text-white p-6 rounded-lg max-w-sm w-11/12">
+            <h3 id="password-title" class="text-lg font-bold mb-2"></h3>
+            <p id="password-message" class="text-sm text-slate-400 mb-4"></p>
+            <input type="password" id="password-input" placeholder="Passphrase"
+                class="w-full mb-4 px-3 py-2 rounded bg-black/40 border border-slate-700 text-white" autocomplete="current-password"/>
+            <div class="flex justify-end gap-3">
+                <button id="password-cancel" class="btn-secondary">Cancel</button>
+                <button id="password-confirm" class="btn-primary">Continue</button>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- Decrypt Progress -->
+    <div id="decrypt-overlay"
+        class="fixed inset-0 bg-black/70 backdrop-blur-sm hidden items-center justify-center z-50">
+
+        <div class="glass-card p-8 w-[360px] text-center">
+            <h3 class="text-lg font-bold mb-4">
+                Decrypting File
+            </h3>
+
+            <p id="decrypt-status"
+            class="text-sm text-slate-400 mb-4">
+                Initializing…
+            </p>
+
+            <div class="w-full bg-slate-800 rounded-full h-2 overflow-hidden">
+                <div id="decrypt-bar"
+                    class="h-full bg-blue-500 transition-all duration-300"
+                    style="width: 0%">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Confirm Modal -->
+    <div id="confirm-modal" class="hidden fixed inset-0 flex items-center justify-center z-50">
+        <div class="absolute inset-0 bg-black/50"></div>
+        <div class="relative bg-[#1e1e2f] text-white p-6 rounded-lg max-w-sm w-11/12">
+            <h3 id="confirm-title" class="text-lg font-bold mb-2"></h3>
+            <p id="confirm-message" class="text-sm text-slate-400 mb-4"></p>
+            <div class="flex justify-end gap-3">
+                <button id="confirm-cancel" class="btn-secondary">No</button>
+                <button id="confirm-confirm" class="btn-primary">Yes</button>
+            </div>
+        </div>
+    </div>
+
+
+
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/key-mgmt.js') }}"></script>
 </body>
 </html>
