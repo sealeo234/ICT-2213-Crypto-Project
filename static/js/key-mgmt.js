@@ -187,17 +187,27 @@ async function exportPrivateKeyWithPrompt(privateKeyBase64) {
         title: "Encrypt Private Key",
         message: "Enter a password to encrypt your private key. This cannot be recovered."
     });
-    if (!password || password.length < 8) {
-        showAlert({ title: "Password Error", message: "Password must be at least 8 characters", type: "error" });
-    ; return; }
-    const password2 = await promptPassword({ title: "Confirm Password", message: "Re-enter the password." });
-    if (password !== password2) return showAlert({ title: "Password Error", message: "Passwords do not match", type: "error" });
 
+    if (!password)
+        throw new Error("Private key export cancelled");
+
+    if (password.length < 8)
+        throw new Error("Password must be at least 8 characters");
+
+    const password2 = await promptPassword({
+        title: "Confirm Password",
+        message: "Re-enter the password."
+    });
+
+    if (!password2)
+        throw new Error("Private key export cancelled");
+
+    if (password !== password2)
+        throw new Error("Passwords do not match");
 
     const encrypted = await encryptPrivateKey(privateKeyBase64, password);
     const pem = buildEncryptedPem(encrypted);
 
-    // Dynamic filename: vault_{uuid}_{timestamp}.pem
     const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
     const filename = `vault_${uuid}_${timestamp}.pem`;
 
@@ -215,35 +225,117 @@ async function exportPrivateKeyWithPrompt(privateKeyBase64) {
     return true;
 }
 
+
 /* ---------- Vault Key Rotation ---------- */
 async function rotateVaultKey() {
     const uuidMeta = document.querySelector('meta[name="user-uuid"]');
-    if (!uuidMeta) { showAlert({ title: "Authentication Error", message: "You are not authenticated.", type: "error" }); return; }
+    if (!uuidMeta) {
+        showAlert({ title: "Authentication Error", message: "You are not authenticated.", type: "error" });
+        return;
+    }
+
     const uuid = uuidMeta.content;
 
     const proceed = await promptConfirm({
         title: "Rotate Key",
-        message: "This will generate a new encryption key.\nYou will NOT be able to decrypt files encrypted with the old key unless you kept a backup.\nContinue?"
+        message: "This will generate a new encryption key and rewrap all your files.\nDo NOT close this window.\nContinue?"
     });
+
     if (!proceed) return;
 
-    const { publicKey, privateKey } = await generateKeyPair();
-    const publicKeyBase64 = await exportPublicKey(publicKey);
-    const privateKeyBase64 = await exportPrivateKey(privateKey);
+    try {
+        showAlert({ title: "Key Rotation", message: "Starting key rotation...", type: "success" });
 
-    await storePrivateKey(uuid, privateKeyBase64);
+        // Load OLD private key
+        const oldPrivateBase64 = await loadPrivateKey(uuid);
+        if (!oldPrivateBase64) throw new Error("Old private key not found");
 
-    const iv = crypto.getRandomValues(new Uint8Array(16));
-    await fetch("/rotate_key", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ public_key: publicKeyBase64, iv: arrayBufferToBase64(iv) })
-    });
+        const oldPrivateKey = await importPrivateKey(oldPrivateBase64);
 
-    await exportPrivateKeyWithPrompt(privateKeyBase64);
+        // Generate NEW keypair
+        const { publicKey, privateKey } = await generateKeyPair();
+        const newPublicBase64 = await exportPublicKey(publicKey);
+        const newPrivateBase64 = await exportPrivateKey(privateKey);
 
-    console.log("Key rotation complete.");
-    location.reload();
+        // Get all files user has access to
+        const fileIds = await fetch("/my_files").then(r => r.json());
+
+        for (const fileId of fileIds) {
+
+            try {
+                const keyResp = await fetch(`/file_key/${fileId}`);
+                if (!keyResp.ok) continue;
+
+                const { wrapped_key } = await keyResp.json();
+                if (!wrapped_key) continue;
+
+                const wrappedKeyBuf = base64ToArrayBuffer(wrapped_key);
+
+                const rawAes = await crypto.subtle.decrypt(
+                    { name: "RSA-OAEP" },
+                    oldPrivateKey,
+                    wrappedKeyBuf
+                );
+
+                const rewrappedBuf = await crypto.subtle.encrypt(
+                    { name: "RSA-OAEP" },
+                    publicKey,
+                    rawAes
+                );
+
+                const newWrapped = arrayBufferToBase64(rewrappedBuf);
+
+                await fetch(`/rewrap_self/${fileId}`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ wrapped_key: newWrapped })
+                });
+
+            } catch (err) {
+                console.error("Rewrap failed:", fileId, err);
+
+                showAlert({
+                    title: "Invalid Private Key",
+                    message: "The loaded private key cannot decrypt your files. Check your passphrase.",
+                    type: "error"
+                });
+
+                return; // stop entire rotation safely
+            }
+        }
+
+        // Update server public key
+        const iv = crypto.getRandomValues(new Uint8Array(16));
+        await fetch("/rotate_key", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                public_key: newPublicBase64,
+                iv: arrayBufferToBase64(iv)
+            })
+        });
+
+        // Store NEW private key
+        await storePrivateKey(uuid, newPrivateBase64);
+
+        await exportPrivateKeyWithPrompt(newPrivateBase64);
+
+        showAlert({
+            title: "Rotation Complete",
+            message: "All files successfully rewrapped with new key.",
+            type: "success"
+        });
+
+        location.reload();
+
+    } catch (err) {
+        console.error(err);
+        showAlert({
+            title: "Rotation Failed",
+            message: err.message || "Key rotation failed.",
+            type: "error"
+        });
+    }
 }
 
 /* ---------- Load Private Key from File ---------- */

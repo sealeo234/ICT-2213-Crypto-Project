@@ -11,12 +11,12 @@ document.addEventListener("DOMContentLoaded", () => {
             return;
         }
 
-        // Check if username exists
         const res = await fetch("/check_username", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ username })
         });
+
         const data = await res.json();
         if (!data.available) {
             showAlert({ title: "Registration Error", message: "Username already exists. Choose another.", type: "error" });
@@ -28,29 +28,33 @@ document.addEventListener("DOMContentLoaded", () => {
         const publicKeyBase64 = await exportPublicKey(keyPair.publicKey);
         const privateKeyBase64 = await exportPrivateKey(keyPair.privateKey);
 
+        // Force export FIRST
+        try {
+            await exportPrivateKeyWithPrompt(privateKeyBase64);
+        } catch (err) {
+            showAlert({
+                title: "Private Key Export Failed",
+                message: err.message,
+                type: "error"
+            });
+            return; // stop registration completely
+        }
+
         // Generate IV
         const iv = crypto.getRandomValues(new Uint8Array(16));
         const ivBase64 = arrayBufferToBase64(iv);
 
-        // Inject public key + IV into form
         form.insertAdjacentHTML("beforeend", `
             <input type="hidden" name="public_key" value="${publicKeyBase64}">
             <input type="hidden" name="iv" value="${ivBase64}">
         `);
 
-        // Store private key in IndexedDB or sessionStorage
+        // Store private key only AFTER successful export
         const uuidMeta = document.querySelector('meta[name="user-uuid"]');
         if (uuidMeta) {
             await storePrivateKey(uuidMeta.content, privateKeyBase64);
         } else {
             sessionStorage.setItem("pending_private_key", privateKeyBase64);
-        }
-
-        // Optional: show export modal, then submit
-        const exported = await exportPrivateKeyWithPrompt(privateKeyBase64);
-        if (!exported) {
-            showAlert({ title: "Registration Cancelled", message: "An error occurred during registration.", type: "error" });
-            return;
         }
 
         form.submit();

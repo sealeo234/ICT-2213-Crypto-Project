@@ -288,6 +288,35 @@ def file_key(file_id):
         return {"error": "access denied"}, 403
     return {"wrapped_key": key.wrapped_key}
 
+@app.route("/my_files")
+@login_required
+def my_files():
+    # Files owned
+    owned = VaultFile.query.filter_by(owner_uuid=current_user.uuid).all()
+
+    # Files shared with user
+    shared_ids = [
+        fk.file_id for fk in
+        FileKey.query.filter_by(recipient_uuid=current_user.uuid).all()
+    ]
+    shared = VaultFile.query.filter(VaultFile.id.in_(shared_ids)).all()
+
+    files = {f.id for f in owned + shared}
+    return jsonify(list(files))
+
+@app.route("/rewrap_self/<int:file_id>", methods=["POST"])
+@login_required
+def rewrap_self(file_id):
+    fk = FileKey.query.filter_by(
+        file_id=file_id,
+        recipient_uuid=current_user.uuid
+    ).first_or_404()
+
+    new_wrapped = request.json.get("wrapped_key")
+    fk.wrapped_key = new_wrapped
+    db.session.commit()
+    return {"status": "ok"}
+
 @app.route("/rotate_key", methods=["POST"])
 @login_required
 def rotate_key():
