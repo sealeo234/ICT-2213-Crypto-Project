@@ -23,17 +23,28 @@ document.addEventListener("DOMContentLoaded", () => {
             return;
         }
 
-        // Generate RSA keypair
-        const keyPair = await generateKeyPair();
-        const publicKeyBase64 = await exportPublicKey(keyPair.publicKey);
-        const privateKeyBase64 = await exportPrivateKey(keyPair.privateKey);
+        // Generate encryption + signing keypairs
+        const encPair = await generateEncryptionKeyPair();
+        const signPair = await generateSigningKeyPair();
+        const encPublicBase64 = await exportPublicKey(encPair.publicKey);
+        const encPrivateBase64 = await exportPrivateKey(encPair.privateKey);
+        const signPublicBase64 = await exportPublicKey(signPair.publicKey);
+        const signPrivateBase64 = await exportPrivateKey(signPair.privateKey);
+
+        const identity = {
+            encPriv: encPrivateBase64,
+            signPriv: signPrivateBase64,
+            encPub: encPublicBase64,
+            signPub: signPublicBase64,
+            version: 1
+        };
 
         // Force export FIRST
         try {
-            await exportPrivateKeyWithPrompt(privateKeyBase64);
+            await exportIdentityWithPrompt(identity);
         } catch (err) {
             showAlert({
-                title: "Private Key Export Failed",
+                title: "Identity Export Failed",
                 message: err.message,
                 type: "error"
             });
@@ -45,16 +56,17 @@ document.addEventListener("DOMContentLoaded", () => {
         const ivBase64 = arrayBufferToBase64(iv);
 
         form.insertAdjacentHTML("beforeend", `
-            <input type="hidden" name="public_key" value="${publicKeyBase64}">
+            <input type="hidden" name="public_key" value="${encPublicBase64}">
+            <input type="hidden" name="signing_public_key" value="${signPublicBase64}">
             <input type="hidden" name="iv" value="${ivBase64}">
         `);
 
         // Store private key only AFTER successful export
         const uuidMeta = document.querySelector('meta[name="user-uuid"]');
         if (uuidMeta) {
-            await storePrivateKey(uuidMeta.content, privateKeyBase64);
+            await storeIdentity(uuidMeta.content, identity);
         } else {
-            sessionStorage.setItem("pending_private_key", privateKeyBase64);
+            sessionStorage.setItem("pending_identity", JSON.stringify(identity));
         }
 
         form.submit();

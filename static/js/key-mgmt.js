@@ -79,6 +79,14 @@ function pemToBase64(pem) {
               .replace(/\s+/g, "");
 }
 
+function encodeUtf8(text) {
+    return new TextEncoder().encode(text);
+}
+
+function decodeUtf8(buf) {
+    return new TextDecoder().decode(buf);
+}
+
 /* ---------- IndexedDB Access ---------- */
 function openDB() {
     return new Promise((resolve, reject) => {
@@ -89,7 +97,7 @@ function openDB() {
     });
 }
 
-async function loadPrivateKey(uuid) {
+async function loadIdentity(uuid) {
     const db = await openDB();
     const tx = db.transaction(STORE_NAME, "readonly");
     const store = tx.objectStore(STORE_NAME);
@@ -100,12 +108,12 @@ async function loadPrivateKey(uuid) {
     });
 }
 
-async function storePrivateKey(uuid, privateKeyBase64) {
+async function storeIdentity(uuid, identity) {
     const db = await openDB();
     const tx = db.transaction(STORE_NAME, "readwrite");
     const store = tx.objectStore(STORE_NAME);
     return new Promise((resolve, reject) => {
-        const req = store.put(privateKeyBase64, uuid);
+        const req = store.put(identity, uuid);
         req.onsuccess = () => resolve(true);
         req.onerror = () => reject(req.error);
     });
@@ -126,13 +134,12 @@ async function deriveKey(password, salt, usages = ["encrypt", "decrypt"]) {
     );
 }
 
-/* ---------- Encrypt / Decrypt Private Key ---------- */
-async function encryptPrivateKey(privateKeyBase64, password) {
+/* ---------- Encrypt / Decrypt Payload ---------- */
+async function encryptPayload(plaintextBytes, password) {
     const salt = crypto.getRandomValues(new Uint8Array(16));
     const iv = crypto.getRandomValues(new Uint8Array(12));
     const key = await deriveKey(password, salt, ["encrypt","decrypt"]);
-    const plaintext = base64ToArrayBuffer(privateKeyBase64);
-    const ciphertext = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, plaintext);
+    const ciphertext = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, plaintextBytes);
     return { salt, iv, ciphertext };
 }
 
@@ -143,27 +150,35 @@ async function decryptPem(encryptedPemBase64, password) {
     const ciphertext = combined.slice(28);
     const key = await deriveKey(password, salt, ["decrypt"]);
     const decrypted = await crypto.subtle.decrypt({ name: "AES-GCM", iv }, key, ciphertext);
-    return arrayBufferToBase64(decrypted);
+    return decrypted;
 }
 
 /* ---------- Build Encrypted PEM ---------- */
 
 // Format: [16-byte salt][12-byte iv][AES-GCM ciphertext]
 
-function buildEncryptedPem({ salt, iv, ciphertext }) {
+function buildEncryptedPem({ salt, iv, ciphertext }, label) {
     const combined = new Uint8Array(salt.byteLength + iv.byteLength + ciphertext.byteLength);
     combined.set(salt, 0);
     combined.set(iv, salt.byteLength);
     combined.set(new Uint8Array(ciphertext), salt.byteLength + iv.byteLength);
-    return toPem(arrayBufferToBase64(combined.buffer), "ENCRYPTED PRIVATE KEY");
+    return toPem(arrayBufferToBase64(combined.buffer), label);
 }
 
 /* ---------- Key Generation / Export ---------- */
-async function generateKeyPair() {
+async function generateEncryptionKeyPair() {
     return crypto.subtle.generateKey(
         { name: "RSA-OAEP", modulusLength: 4096, publicExponent: new Uint8Array([1,0,1]), hash: "SHA-256" },
         true,
         ["encrypt", "decrypt"]
+    );
+}
+
+async function generateSigningKeyPair() {
+    return crypto.subtle.generateKey(
+        { name: "ECDSA", namedCurve: "P-256" },
+        true,
+        ["sign", "verify"]
     );
 }
 
@@ -177,19 +192,19 @@ async function exportPrivateKey(key) {
     return arrayBufferToBase64(pkcs8);
 }
 
-/* ---------- Export Private Key (Unified) ---------- */
-async function exportPrivateKeyWithPrompt(privateKeyBase64) {
+/* ---------- Export Identity Container ---------- */
+async function exportIdentityWithPrompt(identity) {
 
     const uuidMeta = document.querySelector('meta[name="user-uuid"]');
     const uuid = uuidMeta ? uuidMeta.content : "New";
 
     const password = await promptPassword({
-        title: "Encrypt Private Key",
-        message: "Enter a password to encrypt your private key. This cannot be recovered."
+        title: "Encrypt Identity",
+        message: "Enter a password to encrypt your identity container. This cannot be recovered."
     });
 
     if (!password)
-        throw new Error("Private key export cancelled");
+        throw new Error("Identity export cancelled");
 
     if (password.length < 8)
         throw new Error("Password must be at least 8 characters");
@@ -200,13 +215,14 @@ async function exportPrivateKeyWithPrompt(privateKeyBase64) {
     });
 
     if (!password2)
-        throw new Error("Private key export cancelled");
+        throw new Error("Identity export cancelled");
 
     if (password !== password2)
         throw new Error("Passwords do not match");
 
-    const encrypted = await encryptPrivateKey(privateKeyBase64, password);
-    const pem = buildEncryptedPem(encrypted);
+    const payload = encodeUtf8(JSON.stringify(identity));
+    const encrypted = await encryptPayload(payload, password);
+    const pem = buildEncryptedPem(encrypted, "VAULT IDENTITY");
 
     const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
     const filename = `vault_${uuid}_${timestamp}.pem`;
@@ -221,7 +237,7 @@ async function exportPrivateKeyWithPrompt(privateKeyBase64) {
     a.remove();
     URL.revokeObjectURL(url);
 
-    console.log("[Vault] Encrypted private key exported");
+    console.log("[Vault] Encrypted identity exported");
     return true;
 }
 
@@ -247,15 +263,18 @@ async function rotateVaultKey() {
         showAlert({ title: "Key Rotation", message: "Starting key rotation...", type: "success" });
 
         // Load OLD private key
-        const oldPrivateBase64 = await loadPrivateKey(uuid);
-        if (!oldPrivateBase64) throw new Error("Old private key not found");
+        const oldIdentity = await loadIdentity(uuid);
+        if (!oldIdentity || !oldIdentity.encPriv) throw new Error("Old private key not found");
 
-        const oldPrivateKey = await importPrivateKey(oldPrivateBase64);
+        const oldPrivateKey = await importEncryptionPrivateKey(oldIdentity.encPriv);
 
-        // Generate NEW keypair
-        const { publicKey, privateKey } = await generateKeyPair();
-        const newPublicBase64 = await exportPublicKey(publicKey);
-        const newPrivateBase64 = await exportPrivateKey(privateKey);
+        // Generate NEW keypairs
+        const { publicKey: newEncPublicKey, privateKey: newEncPrivateKey } = await generateEncryptionKeyPair();
+        const { publicKey: newSignPublicKey, privateKey: newSignPrivateKey } = await generateSigningKeyPair();
+        const newEncPublicBase64 = await exportPublicKey(newEncPublicKey);
+        const newEncPrivateBase64 = await exportPrivateKey(newEncPrivateKey);
+        const newSignPublicBase64 = await exportPublicKey(newSignPublicKey);
+        const newSignPrivateBase64 = await exportPrivateKey(newSignPrivateKey);
 
         // Get all files user has access to
         const fileIds = await fetch("/my_files").then(r => r.json());
@@ -279,7 +298,7 @@ async function rotateVaultKey() {
 
                 const rewrappedBuf = await crypto.subtle.encrypt(
                     { name: "RSA-OAEP" },
-                    publicKey,
+                    newEncPublicKey,
                     rawAes
                 );
 
@@ -310,15 +329,23 @@ async function rotateVaultKey() {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-                public_key: newPublicBase64,
+                public_key: newEncPublicBase64,
+                signing_public_key: newSignPublicBase64,
                 iv: arrayBufferToBase64(iv)
             })
         });
 
-        // Store NEW private key
-        await storePrivateKey(uuid, newPrivateBase64);
+        // Store NEW identity
+        const newIdentity = {
+            encPriv: newEncPrivateBase64,
+            signPriv: newSignPrivateBase64,
+            encPub: newEncPublicBase64,
+            signPub: newSignPublicBase64,
+            version: 1
+        };
 
-        await exportPrivateKeyWithPrompt(newPrivateBase64);
+        await storeIdentity(uuid, newIdentity);
+        await exportIdentityWithPrompt(newIdentity);
 
         showAlert({
             title: "Rotation Complete",
@@ -352,24 +379,53 @@ async function importPrivateKeyFromFile() {
         if (!file) return;
 
         let text = await file.text();
-        let base64 = pemToBase64(text);
+        const base64 = pemToBase64(text);
+        let identity = null;
 
-        if (/-----BEGIN ENCRYPTED PRIVATE KEY-----/.test(text)) {
+        if (/-----BEGIN VAULT IDENTITY-----/.test(text)) {
+            const password = await promptPassword({
+                title: "Decrypt Identity",
+                message: "Enter the password used to encrypt this identity container."
+            });
+            if (!password) return showAlert({ title: "Password Error", message: "Password required", type: "error" });
+            try {
+                const decrypted = await decryptPem(base64, password);
+                identity = JSON.parse(decodeUtf8(decrypted));
+            } catch (err) {
+                console.error(err);
+                return showAlert({ title: "Decryption Error", message: "Failed to decrypt identity. Wrong password?", type: "error" });
+            }
+        } else if (/-----BEGIN ENCRYPTED PRIVATE KEY-----/.test(text)) {
             const password = await promptPassword({
                 title: "Decrypt Private Key",
                 message: "Enter the password used to encrypt this private key."
             });
             if (!password) return showAlert({ title: "Password Error", message: "Password required", type: "error" });
-            try { base64 = await decryptPem(base64, password); }
-            catch (err) { console.error(err); return showAlert({ title: "Decryption Error", message: "Failed to decrypt private key. Wrong password?", type: "error" }); }
+            try {
+                const decrypted = await decryptPem(base64, password);
+                identity = { encPriv: arrayBufferToBase64(decrypted), signPriv: null, version: 1 };
+            } catch (err) {
+                console.error(err);
+                return showAlert({ title: "Decryption Error", message: "Failed to decrypt private key. Wrong password?", type: "error" });
+            }
+        } else {
+            return showAlert({ title: "Unsupported File", message: "This PEM is not a supported identity container.", type: "error" });
         }
 
         try {
-            await storePrivateKey(uuid, base64);
-            showAlert({ title: "Success", message: "Private key successfully loaded into vault!", type: "success" });
+            await storeIdentity(uuid, identity);
+            if (!identity.signPriv) {
+                showAlert({
+                    title: "Partial Identity Loaded",
+                    message: "Signing key missing. Rotate your keys to enable file authenticity.",
+                    type: "error"
+                });
+                return;
+            }
+            showAlert({ title: "Success", message: "Identity container successfully loaded!", type: "success" });
         } catch (err) {
             console.error(err);
-            showAlert({ title: "Error", message: "Failed to store private key", type: "error" });
+            showAlert({ title: "Error", message: "Failed to store identity", type: "error" });
         }
     };
     input.click();

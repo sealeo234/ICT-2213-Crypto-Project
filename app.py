@@ -8,6 +8,7 @@ import uuid
 import json
 import base64
 from datetime import datetime
+from sqlalchemy import text
 
 
 UPLOAD_FOLDER = 'uploads'
@@ -24,12 +25,28 @@ login_manager = LoginManager(app)
 login_manager.login_view = 'login'
 
 
+def ensure_schema():
+    with db.engine.begin() as conn:
+        user_cols = [row[1] for row in conn.execute(text("PRAGMA table_info(user)")).fetchall()]
+        if "signing_public_key" not in user_cols:
+            conn.execute(text("ALTER TABLE user ADD COLUMN signing_public_key TEXT"))
+
+        file_cols = [row[1] for row in conn.execute(text("PRAGMA table_info(vault_file)")).fetchall()]
+        if "signature" not in file_cols:
+            conn.execute(text("ALTER TABLE vault_file ADD COLUMN signature TEXT"))
+        if "signature_alg" not in file_cols:
+            conn.execute(text("ALTER TABLE vault_file ADD COLUMN signature_alg TEXT"))
+        if "signer_public_key" not in file_cols:
+            conn.execute(text("ALTER TABLE vault_file ADD COLUMN signer_public_key TEXT"))
+
+
 class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     uuid = db.Column(db.String(36), unique=True, nullable=False, default=lambda: str(uuid.uuid4()))
     username = db.Column(db.String(80), unique=True, nullable=False)
     password = db.Column(db.String(120), nullable=False)
     public_key = db.Column(db.Text, nullable=False)
+    signing_public_key = db.Column(db.Text)
     iv = db.Column(db.String(32), nullable=False)
 
 
@@ -38,6 +55,9 @@ class VaultFile(db.Model):
     owner_uuid = db.Column(db.String(36), db.ForeignKey('user.uuid'))
     filename = db.Column(db.String(120))
     iv = db.Column(db.Text)
+    signature = db.Column(db.Text)
+    signature_alg = db.Column(db.String(32))
+    signer_public_key = db.Column(db.Text)
     size = db.Column(db.Integer)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
@@ -97,7 +117,12 @@ def register():
         username = request.form.get('username')
         password = request.form.get('password')
         public_key = request.form.get('public_key')
+        signing_public_key = request.form.get('signing_public_key')
         iv = request.form.get('iv')
+
+        if not public_key or not signing_public_key or not iv:
+            flash('Missing public key material.')
+            return redirect(url_for('register'))
 
         if User.query.filter_by(username=username).first():
             flash('Username already exists.')
@@ -107,6 +132,7 @@ def register():
             username=username,
             password=generate_password_hash(password),
             public_key=public_key,
+            signing_public_key=signing_public_key,
             iv=iv
         )
         db.session.add(new_user)
@@ -169,11 +195,26 @@ def upload_file():
 
     iv = request.form.get("iv")
     wrapped_keys = request.form.get("wrapped_keys")
+    signature = request.form.get("signature")
+    signature_alg = request.form.get("signature_alg")
+    signer_public_key = request.form.get("signer_public_key")
+
+    if not signature or not signature_alg or not signer_public_key:
+        return "Missing signature metadata", 400
+
+    if not current_user.signing_public_key:
+        return "Signing key not registered", 400
+
+    if signer_public_key != current_user.signing_public_key:
+        return "Signing key mismatch", 400
 
     vault_file = VaultFile(
         owner_uuid=current_user.uuid,
         filename=filename,
         iv=iv,
+        signature=signature,
+        signature_alg=signature_alg,
+        signer_public_key=signer_public_key,
         size=size
     )
 
@@ -236,6 +277,28 @@ def file_iv(file_id):
         return {"error": "access denied"}, 403
 
     return {"iv": record.iv}
+
+
+@app.route('/file_signature/<int:file_id>')
+@login_required
+def file_signature(file_id):
+    record = VaultFile.query.filter_by(id=file_id).first()
+    if not record:
+        return {"error": "not found"}, 404
+
+    allowed = (
+        record.owner_uuid == current_user.uuid or
+        FileKey.query.filter_by(file_id=file_id, recipient_uuid=current_user.uuid).first()
+    )
+
+    if not allowed:
+        return {"error": "access denied"}, 403
+
+    return {
+        "signature": record.signature,
+        "signature_alg": record.signature_alg,
+        "signer_public_key": record.signer_public_key,
+    }
 
 
 
@@ -321,12 +384,15 @@ def rewrap_self(file_id):
 @login_required
 def rotate_key():
     public_key = request.json.get("public_key")
+    signing_public_key = request.json.get("signing_public_key")
     iv = request.json.get("iv")
 
     if not public_key or not iv:
         return {"error": "invalid payload"}, 400
 
     current_user.public_key = public_key
+    if signing_public_key:
+        current_user.signing_public_key = signing_public_key
     current_user.iv = iv
     db.session.commit()
 
@@ -405,4 +471,5 @@ def rewrap_keys(file_id):
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()
+        ensure_schema()
     app.run(debug=True)
