@@ -1,8 +1,45 @@
-/* =========================================================
-   Secure Private Key Export and Import (Encrypted PEM)
-   ========================================================= */
+/* 
+    Shared Key/Identity Management Helpers
+    has UI prompts and alerts
+    uses encoding and buffer utilities
+    uses IndexedDB identity storage
+    supports identity container import/export (.pem)
+*/
 
-/* ---------- Password Prompt Modal ---------- */
+// UI
+function handleError(err, title = "Error") {
+    console.error(err);
+    const message = err?.message || "An unexpected error occurred";
+    showAlert({ title, message, type: "error" });
+}
+
+// Alert modal renderer
+function showAlert({ title = "Alert", message = "", type = "error" }) {
+    const modal = document.getElementById("alert-modal");
+    modal.classList.remove("hidden");
+    document.getElementById("alert-title").textContent = title;
+    document.getElementById("alert-message").textContent = message;
+
+    const box = document.getElementById("alert-box");
+    box.style.borderColor = type === "error" ? "#3b82f6" : "#ffffff";
+    box.querySelector("button").onclick = () => modal.classList.add("hidden");
+}
+
+async function ensurePrivateKeyPresent() {
+    const identity = await getIdentity();
+    if (!identity || !identity.encPriv) {
+        showAlert({
+            title: "Private Key Required",
+            message: "Your private key is not loaded. Please load your identity container before accessing or decrypting files.",
+            type: "error"
+        });
+        return false;
+    }
+
+    return true;
+}
+
+// Modal prompts
 function promptPassword({ title, message }) {
     return new Promise(resolve => {
         const modal = document.getElementById("password-modal");
@@ -52,7 +89,7 @@ async function promptConfirm({ title, message }) {
 }
 
 
-/* ---------- Base64 / Buffer Helpers ---------- */
+// Encoding / buffer utilities
 function arrayBufferToBase64(buf) {
     let binary = "";
     const bytes = new Uint8Array(buf);
@@ -87,7 +124,21 @@ function decodeUtf8(buf) {
     return new TextDecoder().decode(buf);
 }
 
-/* ---------- IndexedDB Access ---------- */
+function generateRandomBytes(length) {
+    return crypto.getRandomValues(new Uint8Array(length));
+}
+
+function concatBuffers(a, b) {
+    const out = new Uint8Array(a.byteLength + b.byteLength);
+    out.set(new Uint8Array(a), 0);
+    out.set(new Uint8Array(b), a.byteLength);
+    return out.buffer;
+}
+
+// IndexedDB identity store
+const DB_NAME = "vault_keys";
+const STORE_NAME = "keys";
+
 function openDB() {
     return new Promise((resolve, reject) => {
         const req = indexedDB.open(DB_NAME, 1);
@@ -119,43 +170,20 @@ async function storeIdentity(uuid, identity) {
     });
 }
 
-/* ---------- Crypto: Derive AES Key ---------- */
-async function deriveKey(password, salt, usages = ["encrypt", "decrypt"]) {
-    const enc = new TextEncoder();
-    const baseKey = await crypto.subtle.importKey(
-        "raw", enc.encode(password), "PBKDF2", false, ["deriveKey"]
-    );
-    return crypto.subtle.deriveKey(
-        { name: "PBKDF2", salt, iterations: 100_000, hash: "SHA-256" },
-        baseKey,
-        { name: "AES-GCM", length: 256 },
-        false,
-        usages
-    );
+async function getIdentity() {
+    const uuidMeta = document.querySelector('meta[name="user-uuid"]');
+    if (!uuidMeta) return null;
+    const record = await loadIdentity(uuidMeta.content);
+    if (!record) return null;
+    if (typeof record === "string") {
+        return { encPriv: record, signPriv: null, version: 1 };
+    }
+    return record;
 }
 
-/* ---------- Encrypt / Decrypt Payload ---------- */
-async function encryptPayload(plaintextBytes, password) {
-    const salt = crypto.getRandomValues(new Uint8Array(16));
-    const iv = crypto.getRandomValues(new Uint8Array(12));
-    const key = await deriveKey(password, salt, ["encrypt","decrypt"]);
-    const ciphertext = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, plaintextBytes);
-    return { salt, iv, ciphertext };
-}
+// Encrypted identity container format
 
-async function decryptPem(encryptedPemBase64, password) {
-    const combined = new Uint8Array(base64ToArrayBuffer(encryptedPemBase64));
-    const salt = combined.slice(0, 16);
-    const iv = combined.slice(16, 28);
-    const ciphertext = combined.slice(28);
-    const key = await deriveKey(password, salt, ["decrypt"]);
-    const decrypted = await crypto.subtle.decrypt({ name: "AES-GCM", iv }, key, ciphertext);
-    return decrypted;
-}
-
-/* ---------- Build Encrypted PEM ---------- */
-
-// Format: [16-byte salt][12-byte iv][AES-GCM ciphertext]
+// Binary layout before PEM encoding: [16-byte salt][12-byte IV][AES-GCM ciphertext]
 
 function buildEncryptedPem({ salt, iv, ciphertext }, label) {
     const combined = new Uint8Array(salt.byteLength + iv.byteLength + ciphertext.byteLength);
@@ -165,23 +193,7 @@ function buildEncryptedPem({ salt, iv, ciphertext }, label) {
     return toPem(arrayBufferToBase64(combined.buffer), label);
 }
 
-/* ---------- Key Generation / Export ---------- */
-async function generateEncryptionKeyPair() {
-    return crypto.subtle.generateKey(
-        { name: "RSA-OAEP", modulusLength: 4096, publicExponent: new Uint8Array([1,0,1]), hash: "SHA-256" },
-        true,
-        ["encrypt", "decrypt"]
-    );
-}
-
-async function generateSigningKeyPair() {
-    return crypto.subtle.generateKey(
-        { name: "ECDSA", namedCurve: "P-256" },
-        true,
-        ["sign", "verify"]
-    );
-}
-
+// Key export helpers
 async function exportPublicKey(key) {
     const spki = await crypto.subtle.exportKey("spki", key);
     return arrayBufferToBase64(spki);
@@ -192,7 +204,7 @@ async function exportPrivateKey(key) {
     return arrayBufferToBase64(pkcs8);
 }
 
-/* ---------- Export Identity Container ---------- */
+// Export identity container (.pem)
 async function exportIdentityWithPrompt(identity) {
 
     const uuidMeta = document.querySelector('meta[name="user-uuid"]');
@@ -241,131 +253,7 @@ async function exportIdentityWithPrompt(identity) {
     return true;
 }
 
-
-/* ---------- Vault Key Rotation ---------- */
-async function rotateVaultKey() {
-    const uuidMeta = document.querySelector('meta[name="user-uuid"]');
-    if (!uuidMeta) {
-        showAlert({ title: "Authentication Error", message: "You are not authenticated.", type: "error" });
-        return;
-    }
-
-    const uuid = uuidMeta.content;
-
-    const proceed = await promptConfirm({
-        title: "Rotate Key",
-        message: "This will generate a new encryption key and rewrap all your files.\nDo NOT close this window.\nContinue?"
-    });
-
-    if (!proceed) return;
-
-    try {
-        showAlert({ title: "Key Rotation", message: "Starting key rotation...", type: "success" });
-
-        // Load OLD private key
-        const oldIdentity = await loadIdentity(uuid);
-        if (!oldIdentity || !oldIdentity.encPriv) throw new Error("Old private key not found");
-
-        const oldPrivateKey = await importEncryptionPrivateKey(oldIdentity.encPriv);
-
-        // Generate NEW keypairs
-        const { publicKey: newEncPublicKey, privateKey: newEncPrivateKey } = await generateEncryptionKeyPair();
-        const { publicKey: newSignPublicKey, privateKey: newSignPrivateKey } = await generateSigningKeyPair();
-        const newEncPublicBase64 = await exportPublicKey(newEncPublicKey);
-        const newEncPrivateBase64 = await exportPrivateKey(newEncPrivateKey);
-        const newSignPublicBase64 = await exportPublicKey(newSignPublicKey);
-        const newSignPrivateBase64 = await exportPrivateKey(newSignPrivateKey);
-
-        // Get all files user has access to
-        const fileIds = await fetch("/my_files").then(r => r.json());
-
-        for (const fileId of fileIds) {
-
-            try {
-                const keyResp = await fetch(`/file_key/${fileId}`);
-                if (!keyResp.ok) continue;
-
-                const { wrapped_key } = await keyResp.json();
-                if (!wrapped_key) continue;
-
-                const wrappedKeyBuf = base64ToArrayBuffer(wrapped_key);
-
-                const rawAes = await crypto.subtle.decrypt(
-                    { name: "RSA-OAEP" },
-                    oldPrivateKey,
-                    wrappedKeyBuf
-                );
-
-                const rewrappedBuf = await crypto.subtle.encrypt(
-                    { name: "RSA-OAEP" },
-                    newEncPublicKey,
-                    rawAes
-                );
-
-                const newWrapped = arrayBufferToBase64(rewrappedBuf);
-
-                await fetch(`/rewrap_self/${fileId}`, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ wrapped_key: newWrapped })
-                });
-
-            } catch (err) {
-                console.error("Rewrap failed:", fileId, err);
-
-                showAlert({
-                    title: "Invalid Private Key",
-                    message: "The loaded private key cannot decrypt your files. Check your passphrase.",
-                    type: "error"
-                });
-
-                return; // stop entire rotation safely
-            }
-        }
-
-        // Update server public key
-        const iv = crypto.getRandomValues(new Uint8Array(16));
-        await fetch("/rotate_key", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                public_key: newEncPublicBase64,
-                signing_public_key: newSignPublicBase64,
-                iv: arrayBufferToBase64(iv)
-            })
-        });
-
-        // Store NEW identity
-        const newIdentity = {
-            encPriv: newEncPrivateBase64,
-            signPriv: newSignPrivateBase64,
-            encPub: newEncPublicBase64,
-            signPub: newSignPublicBase64,
-            version: 1
-        };
-
-        await storeIdentity(uuid, newIdentity);
-        await exportIdentityWithPrompt(newIdentity);
-
-        showAlert({
-            title: "Rotation Complete",
-            message: "All files successfully rewrapped with new key.",
-            type: "success"
-        });
-
-        location.reload();
-
-    } catch (err) {
-        console.error(err);
-        showAlert({
-            title: "Rotation Failed",
-            message: err.message || "Key rotation failed.",
-            type: "error"
-        });
-    }
-}
-
-/* ---------- Load Private Key from File ---------- */
+// Import identity/private key from .pem
 async function importPrivateKeyFromFile() {
     const uuidMeta = document.querySelector('meta[name="user-uuid"]');
     if (!uuidMeta) { showAlert({ title: "Authentication Error", message: "You are not authenticated.", type: "error" }); return; }
@@ -431,12 +319,35 @@ async function importPrivateKeyFromFile() {
     input.click();
 }
 
-/* ---------- Event Bindings ---------- */
-document.addEventListener("DOMContentLoaded", () => {
-    const rotateBtn = document.getElementById("rotate-key-btn");
-    if (rotateBtn) rotateBtn.addEventListener("click", rotateVaultKey);
 
+// Persist post-registration identity
+// (used when identity is staged in sessionStorage pre-auth)
+async function commitPendingKey() {
+    if (navigator.storage && navigator.storage.persist) {
+        const granted = await navigator.storage.persist();
+        console.log("[Vault] Storage persistence:", granted);
+        if (!granted) {
+            console.log("Warning: Your browser may delete your vault keys.");
+        }
+    }
+
+    const pendingIdentity = sessionStorage.getItem("pending_identity");
+    if (!pendingIdentity) return;
+
+    const uuidMeta = document.querySelector('meta[name="user-uuid"]');
+    if (!uuidMeta) return;
+
+    await storeIdentity(uuidMeta.content, JSON.parse(pendingIdentity));
+    sessionStorage.removeItem("pending_identity");
+
+    console.log("[Vault] Identity committed to IndexedDB");
+}
+
+// Event wiring
+document.addEventListener("DOMContentLoaded", () => {
     const loadBtn = document.getElementById("load-key-btn");
     if (loadBtn) loadBtn.addEventListener("click", importPrivateKeyFromFile);
+
+    commitPendingKey();
 });
 

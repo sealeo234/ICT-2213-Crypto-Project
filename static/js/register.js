@@ -1,3 +1,10 @@
+/* ===============================
+    Registration Flow
+    - Username availability check
+    - Keypair generation
+    - Identity container export
+    - Initial key material submit
+================================ */
 document.addEventListener("DOMContentLoaded", () => {
     const form = document.querySelector("form");
     if (!form) return;
@@ -23,7 +30,7 @@ document.addEventListener("DOMContentLoaded", () => {
             return;
         }
 
-        // Generate encryption + signing keypairs
+        // Generate encryption/signing keypairs and convert to storable base64
         const encPair = await generateEncryptionKeyPair();
         const signPair = await generateSigningKeyPair();
         const encPublicBase64 = await exportPublicKey(encPair.publicKey);
@@ -39,7 +46,7 @@ document.addEventListener("DOMContentLoaded", () => {
             version: 1
         };
 
-        // Force export FIRST
+        // Require local identity export before allowing registration to proceed
         try {
             await exportIdentityWithPrompt(identity);
         } catch (err) {
@@ -48,11 +55,11 @@ document.addEventListener("DOMContentLoaded", () => {
                 message: err.message,
                 type: "error"
             });
-            return; // stop registration completely
+            return;
         }
 
-        // Generate IV
-        const iv = crypto.getRandomValues(new Uint8Array(16));
+        // Registration metadata IV expected by backend schema
+        const iv = generateRandomBytes(16);
         const ivBase64 = arrayBufferToBase64(iv);
 
         form.insertAdjacentHTML("beforeend", `
@@ -61,7 +68,7 @@ document.addEventListener("DOMContentLoaded", () => {
             <input type="hidden" name="iv" value="${ivBase64}">
         `);
 
-        // Store private key only AFTER successful export
+        // Persist identity only after successful export
         const uuidMeta = document.querySelector('meta[name="user-uuid"]');
         if (uuidMeta) {
             await storeIdentity(uuidMeta.content, identity);

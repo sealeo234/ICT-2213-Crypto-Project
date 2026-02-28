@@ -343,10 +343,17 @@ def file_key(file_id):
     all_keys = request.args.get("all") == "true"
     
     if all_keys:
-        keys = FileKey.query.filter_by(file_id=file_id).all()
-        return jsonify({k.recipient_uuid: k.wrapped_key for k in keys})
+        keys = FileKey.query.filter_by(file_id=file_id).order_by(FileKey.id.desc()).all()
+        latest_by_recipient = {}
+        for key in keys:
+            if key.recipient_uuid not in latest_by_recipient:
+                latest_by_recipient[key.recipient_uuid] = key.wrapped_key
+        return jsonify(latest_by_recipient)
     
-    key = FileKey.query.filter_by(file_id=file_id, recipient_uuid=current_user.uuid).first()
+    key = FileKey.query.filter_by(
+        file_id=file_id,
+        recipient_uuid=current_user.uuid
+    ).order_by(FileKey.id.desc()).first()
     if not key:
         return {"error": "access denied"}, 403
     return {"wrapped_key": key.wrapped_key}
@@ -370,13 +377,20 @@ def my_files():
 @app.route("/rewrap_self/<int:file_id>", methods=["POST"])
 @login_required
 def rewrap_self(file_id):
-    fk = FileKey.query.filter_by(
+    rows = FileKey.query.filter_by(
         file_id=file_id,
         recipient_uuid=current_user.uuid
-    ).first_or_404()
+    ).order_by(FileKey.id.desc()).all()
+
+    if not rows:
+        return {"error": "access denied"}, 403
 
     new_wrapped = request.json.get("wrapped_key")
-    fk.wrapped_key = new_wrapped
+    rows[0].wrapped_key = new_wrapped
+
+    for duplicate in rows[1:]:
+        db.session.delete(duplicate)
+
     db.session.commit()
     return {"status": "ok"}
 

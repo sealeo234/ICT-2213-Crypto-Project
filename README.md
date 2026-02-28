@@ -31,6 +31,25 @@ The server also maintains a table of registered users, their password hashes and
 * The recipient retrieves their private key from their browser’s IndexedDB (or imports it from a saved .pem file) to decrypt the FEK.
 * Using the decrypted FEK and IV, the recipient decrypts the file locally in the browser, ensuring end-to-end encryption without the server ever seeing the plaintext content.
 
+## Frontend JavaScript Structure
+
+The frontend code is split by feature flow, while low-level cryptographic primitives are grouped under a dedicated `crypto/` subfolder.
+
+**Feature Flow Files (`static/js/`):**
+
+* `register.js` — registration flow and initial keypair generation/export trigger.
+* `upload.js` — file upload orchestration, FEK-based encryption flow, wrapping, and signature metadata submission.
+* `download.js` — file download orchestration, signature verification, FEK unwrapping, and decryption flow.
+* `access-update.js` — owner access-list updates and FEK rewrapping for recipients.
+* `key-rotate.js` — user key rotation and per-file rewrap process.
+* `key-mgmt.js` — shared helpers (UI prompts/alerts, IndexedDB identity storage/load, encoding utilities, identity import/export).
+
+**Low-Level Crypto Files (`static/js/crypto/`):**
+
+* `fek.js` — AES-GCM and FEK-level operations.
+* `key-wrapping.js` — RSA-OAEP key import/wrap/unwrap operations.
+* `ecdsa-sign.js` — ECDSA key import/sign/verify operations.
+
 ## Security Properties
 
 This design helps protect against:
