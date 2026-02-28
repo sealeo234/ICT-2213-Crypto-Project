@@ -8,6 +8,19 @@ The server maintains a table of encrypted files, and maintains an Access Control
 
 The server also maintains a table of registered users, their password hashes and their UUIDs.
 
+## Quick Setup
+
+1. Optional: Create and activate a virtual environment:
+	- Windows (PowerShell):
+	  - `python -m venv .venv`
+	  - `.\.venv\Scripts\Activate.ps1`
+2. Install dependencies:
+	- `pip install -r requirements.txt`
+3. Run the application:
+	- `python app.py`
+4. Open in browser:
+	- `http://127.0.0.1:5000`
+
 ## Technicals
 
 **File Upload:**
