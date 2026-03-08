@@ -414,6 +414,31 @@ def rotate_key():
 
     return {"status": "ok"}
 
+@app.route("/search_user", methods=["GET"])
+@login_required
+def search_user():
+    # Grab the username from the query string (e.g., ?username=XYZ)
+    username = request.args.get("username", "").strip()
+    
+    if not username:
+        return {"error": "No username provided"}, 400
+        
+    # Prevent the owner from searching for themselves (they always have access)
+    if username.lower() == current_user.username.lower():
+        return {"error": "You already have owner access to this file."}, 400
+
+    # Query the database for an exact match (case-insensitive)
+    user = User.query.filter(User.username.ilike(username)).first()
+    
+    if not user:
+        return {"error": "User not found"}, 404
+
+    # Return the data our frontend expects
+    return {
+        "username": user.username,
+        "uuid": user.uuid
+    }
+
 @app.route('/edit_access/<int:file_id>', methods=['GET', 'POST'])
 @login_required
 def edit_access(file_id):
