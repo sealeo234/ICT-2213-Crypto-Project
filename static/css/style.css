@@ -63,14 +63,32 @@ body {
     border-color: rgba(59, 130, 246, 0.2);
 }
 
+/* Fallback for browsers that don't support backdrop-filter (like some versions of Brave) */
+@supports not (backdrop-filter: blur(16px)) {
+    .glass-card {
+        background: rgba(15, 23, 42, 0.95);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.6);
+    }
+}
+
 /* --- Navigation --- */
 nav {
     border-bottom: 1px solid var(--border-glass);
     background: rgba(2, 6, 23, 0.8);
     backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
     height: 80px;
     display: flex;
     align-items: center;
+}
+
+/* Fallback for navigation in browsers without backdrop-filter support */
+@supports not (backdrop-filter: blur(8px)) {
+    nav {
+        background: rgba(2, 6, 23, 0.95);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
 }
 
 .nav-brand {
@@ -175,6 +193,12 @@ input:focus {
 .dropzone:hover {
     border-color: var(--accent-blue);
     background: rgba(59, 130, 246, 0.03);
+}
+
+.dropzone.dragover {
+    border-color: var(--accent-blue);
+    background: rgba(59, 130, 246, 0.1);
+    transform: scale(1.02);
 }
 
 .dropzone-icon {
