@@ -336,7 +336,7 @@ async function importPrivateKeyFromFile() {
 
 
 // Persist post-registration identity
-// (used when identity is staged in sessionStorage pre-auth)
+// (used when identity is staged in IndexedDB under "__pending__" key pre-auth)
 async function commitPendingKey() {
     if (navigator.storage && navigator.storage.persist) {
         const granted = await navigator.storage.persist();
@@ -346,16 +346,69 @@ async function commitPendingKey() {
         }
     }
 
-    const pendingIdentity = sessionStorage.getItem("pending_identity");
-    if (!pendingIdentity) return;
+    // Check for both IndexedDB pending and legacy sessionStorage pending
+    let pendingIdentity = null;
+    let pendingSource = null;
+
+    // Try IndexedDB first (new method for remote compatibility)
+    try {
+        pendingIdentity = await loadIdentity("__pending__");
+        if (pendingIdentity) {
+            pendingSource = "indexeddb";
+        }
+    } catch (err) {
+        console.warn("[Vault] Could not load pending identity from IndexedDB:", err);
+    }
+
+    // Fallback to sessionStorage (legacy method)
+    if (!pendingIdentity) {
+        const sessionPending = sessionStorage.getItem("pending_identity");
+        if (sessionPending) {
+            try {
+                pendingIdentity = JSON.parse(sessionPending);
+                pendingSource = "sessionstorage";
+            } catch (err) {
+                console.warn("[Vault] Failed to parse pending identity from sessionStorage:", err);
+            }
+        }
+    }
+
+    if (!pendingIdentity) {
+        console.log("[Vault] No pending identity found");
+        return;
+    }
 
     const uuidMeta = document.querySelector('meta[name="user-uuid"]');
-    if (!uuidMeta) return;
+    if (!uuidMeta) {
+        console.log("[Vault] User not authenticated, cannot commit pending identity");
+        return;
+    }
 
-    await storeIdentity(uuidMeta.content, JSON.parse(pendingIdentity));
-    sessionStorage.removeItem("pending_identity");
+    const uuid = uuidMeta.content;
 
-    console.log("[Vault] Identity committed to IndexedDB");
+    try {
+        // Migrate from temporary storage to permanent user-uuid storage
+        await storeIdentity(uuid, pendingIdentity);
+        
+        // Clean up temporary storage
+        if (pendingSource === "indexeddb") {
+            const db = await openDB();
+            const tx = db.transaction(STORE_NAME, "readwrite");
+            const store = tx.objectStore(STORE_NAME);
+            await new Promise((resolve, reject) => {
+                const req = store.delete("__pending__");
+                req.onsuccess = () => resolve();
+                req.onerror = () => reject(req.error);
+            });
+        }
+        if (pendingSource === "sessionstorage") {
+            sessionStorage.removeItem("pending_identity");
+        }
+
+        console.log("[Vault] Pending identity committed to IndexedDB under UUID:", uuid);
+    } catch (err) {
+        console.error("[Vault] Failed to commit pending identity:", err);
+    }
 }
 
 // Event wiring

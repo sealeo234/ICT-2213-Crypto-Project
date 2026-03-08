@@ -83,7 +83,10 @@ document.addEventListener("DOMContentLoaded", () => {
         if (uuidMeta) {
             await storeIdentity(uuidMeta.content, identity);
         } else {
-            sessionStorage.setItem("pending_identity", JSON.stringify(identity));
+            // Store to temp pending key in IndexedDB for remote access compatibility
+            // This will be migrated to the proper user-uuid after registration completes
+            await storeIdentity("__pending__", identity);
+            console.log("[Vault] Identity stored as pending for post-registration migration");
         }
 
         form.submit();
