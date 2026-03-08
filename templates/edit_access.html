@@ -27,56 +27,62 @@
         </div>
 
         <!-- Access Form -->
-        <form method="POST" data-edit-access data-file-id="{{ file.id }}">
+<form method="POST" data-edit-access data-file-id="{{ file.id }}">
 
-            <div class="space-y-4 mb-10">
-
-                {% for user in all_users %}
-                <label class="flex items-center justify-between p-4 rounded-xl bg-white/5 hover:bg-white/10 transition cursor-pointer">
-
-                    <div>
-                        <p class="font-medium text-slate-300">
-                            {{ user.username }}
-                        </p>
-                        <p class="text-xs text-slate-500 font-mono">
-                            {{ user.uuid }}
-                        </p>
-                    </div>
-
-                    <div>
-                        <input type="checkbox"
-                               name="recipients"
-                               value="{{ user.uuid }}"
-                               {% if user.uuid in current_access_uuids %}checked{% endif %}
-                               class="w-5 h-5 accent-yellow-400 cursor-pointer">
-                    </div>
-
-                </label>
-                {% endfor %}
-
-                {% if all_users|length == 0 %}
-                <div class="text-sm text-slate-500 italic">
-                    No other users available.
+            <div class="mb-6">
+                <div class="flex gap-3">
+                    <input type="text" 
+                           id="search-username" 
+                           placeholder="Search username to grant access..." 
+                           class="flex-1 px-4 py-3 rounded-lg bg-black/40 border border-slate-700 text-white focus:outline-none focus:border-yellow-400 transition"
+                           autocomplete="off">
+                    <button type="button" 
+                            id="search-btn" 
+                            class="btn-secondary px-6 py-3 whitespace-nowrap">
+                        Find User
+                    </button>
                 </div>
-                {% endif %}
-
+                <div id="search-error" class="text-red-400 text-sm mt-2 hidden"></div>
             </div>
 
-            <!-- Actions -->
-            <div class="flex justify-between items-center pt-6 border-t border-slate-800">
+            <div id="recipients-container" class="space-y-4 mb-10">
+                <h3 class="text-sm font-bold text-slate-400 uppercase tracking-widest mb-3 border-b border-slate-800 pb-2">Current Access List</h3>
+                
+                {% for user in all_users %}
+                    {% if user.uuid in current_access_uuids %}
+                    <label class="flex items-center justify-between p-4 rounded-xl bg-white/5 hover:bg-white/10 transition cursor-pointer">
+                        <div>
+                            <p class="font-medium text-slate-300">{{ user.username }}</p>
+                            <p class="text-xs text-slate-500 font-mono">{{ user.uuid }}</p>
+                        </div>
+                        <div>
+                            <input type="checkbox"
+                                   name="recipients"
+                                   value="{{ user.uuid }}"
+                                   checked
+                                   class="w-5 h-5 accent-yellow-400 cursor-pointer">
+                        </div>
+                    </label>
+                    {% endif %}
+                {% endfor %}
 
+                {% if current_access_uuids|length == 0 %}
+                <div id="empty-state" class="text-sm text-slate-500 italic">
+                    No other users currently have access.
+                </div>
+                {% endif %}
+            </div>
+
+            <div class="flex justify-between items-center pt-6 border-t border-slate-800">
                 <a href="{{ url_for('index') }}"
                    class="text-slate-400 hover:text-slate-200 transition">
                     ← Back to Vault
                 </a>
-
                 <button type="submit"
                         class="btn-primary px-8 py-3">
                     Save Access Changes
                 </button>
-
             </div>
-
         </form>
 
     </div>
