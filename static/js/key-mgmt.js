@@ -28,7 +28,7 @@ function checkCryptoSupport() {
 }
 
 // Alert modal renderer
-function showAlert({ title = "Alert", message = "", type = "error" }) {
+function showAlert({ title = "Alert", message = "", type = "error", onClose }) {
     const modal = document.getElementById("alert-modal");
     modal.classList.remove("hidden");
     document.getElementById("alert-title").textContent = title;
@@ -36,7 +36,10 @@ function showAlert({ title = "Alert", message = "", type = "error" }) {
 
     const box = document.getElementById("alert-box");
     box.style.borderColor = type === "error" ? "#3b82f6" : "#ffffff";
-    box.querySelector("button").onclick = () => modal.classList.add("hidden");
+    box.querySelector("button").onclick = () => {
+        modal.classList.add("hidden");
+        if (typeof onClose === "function") onClose();
+    };
 }
 
 async function ensurePrivateKeyPresent() {
@@ -336,7 +339,6 @@ async function importPrivateKeyFromFile() {
 
 
 // Persist post-registration identity
-// (used when identity is staged in IndexedDB under "__pending__" key pre-auth)
 async function commitPendingKey() {
     console.log("[Vault] commitPendingKey() called");
     
@@ -374,10 +376,8 @@ async function commitPendingKey() {
     let pendingSource = null;
 
     try {
-        console.log("[Vault] Attempting to load pending identity from IndexedDB...");
         pendingIdentity = await loadIdentity("__pending__");
         if (pendingIdentity) {
-            console.log("[Vault] Found pending identity in IndexedDB");
             pendingSource = "indexeddb";
         }
     } catch (err) {
@@ -431,10 +431,7 @@ async function commitPendingKey() {
             const store = tx.objectStore(STORE_NAME);
             await new Promise((resolve, reject) => {
                 const req = store.delete("__pending__");
-                req.onsuccess = () => {
-                    console.log("[Vault] Cleaned up IndexedDB __pending__ key");
-                    resolve();
-                };
+                req.onsuccess = () => resolve();
                 req.onerror = () => reject(req.error);
             });
         }
@@ -445,12 +442,12 @@ async function commitPendingKey() {
         
         // Clear the pending migration flag
         sessionStorage.removeItem("__pending_migration__");
-        console.log("[Vault] SUCCESS: Pending identity fully committed to IndexedDB");
         
         showAlert({
             title: "Identity Loaded",
             message: "Your cryptographic identity has been automatically loaded.",
-            type: "success"
+            type: "success",
+            onClose: () => window.location.reload()
         });
     } catch (err) {
         console.error("[Vault] Failed to commit pending identity:", err);
@@ -477,13 +474,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const uuidMeta = document.querySelector('meta[name="user-uuid"]');
     if (uuidMeta) {
         console.log("[Vault] User authenticated with UUID:", uuidMeta.content);
-        getIdentity().then(identity => {
-            if (identity) {
-                console.log("[Vault] Cryptographic identity successfully loaded from IndexedDB");
-            } else {
-                console.warn("[Vault] No identity found in IndexedDB for UUID:", uuidMeta.content);
-            }
-        }).catch(err => {
+        getIdentity().catch(err => {
             console.error("[Vault] Error loading identity:", err);
         });
     }
