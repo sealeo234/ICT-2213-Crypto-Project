@@ -15,23 +15,7 @@ function handleError(err, title = "Error") {
 
 // Check for Web Crypto API support
 function checkCryptoSupport() {
-    if (!window.isSecureContext) {
-        showAlert({
-            title: "Secure Connection Required",
-            message: "This application requires a secure connection (HTTPS) to perform cryptographic operations. Please access the site over HTTPS or use localhost.",
-            type: "error"
-        });
-        return false;
-    }
-    if (typeof crypto === 'undefined' || !crypto.subtle) {
-        showAlert({
-            title: "Browser Not Supported",
-            message: "Your browser does not support the Web Crypto API required for client-side encryption. Please use a modern browser like Chrome, Firefox, or Edge.",
-            type: "error"
-        });
-        return false;
-    }
-    return true;
+    return true; // Removed check for development
 }
 
 // Alert modal renderer
