@@ -78,17 +78,33 @@ document.addEventListener("DOMContentLoaded", () => {
             <input type="hidden" name="iv" value="${ivBase64}">
         `);
 
-        // Persist identity only after successful export
-        const uuidMeta = document.querySelector('meta[name="user-uuid"]');
-        if (uuidMeta) {
-            await storeIdentity(uuidMeta.content, identity);
-        } else {
-            // Store to temp pending key in IndexedDB for remote access compatibility
-            // This will be migrated to the proper user-uuid after registration completes
+        // Persist identity to IndexedDB before form submission
+        // This ensures the identity is available in the browser after registration redirect
+        console.log("[Vault] Storing identity to IndexedDB before form submission...");
+        try {
+            // Store to temp pending key in IndexedDB for auto-loading after registration
             await storeIdentity("__pending__", identity);
-            console.log("[Vault] Identity stored as pending for post-registration migration");
+            console.log("[Vault] Identity successfully stored to IndexedDB with key '__pending__'");
+            
+            // Verify the write succeeded by attempting to read it back
+            const verifyIdentity = await loadIdentity("__pending__");
+            if (!verifyIdentity) {
+                throw new Error("Identity write verification failed");
+            }
+            console.log("[Vault] Identity write verified successfully");
+        } catch (err) {
+            console.error("[Vault] Failed to store identity to IndexedDB:", err);
+            showAlert({
+                title: "Storage Error",
+                message: "Failed to store cryptographic identity. Please try again.",
+                type: "error"
+            });
+            return;
         }
 
+        // Delay slightly to ensure database transaction completes before page unload
+        await new Promise(resolve => setTimeout(resolve, 100));
+        console.log("[Vault] Submitting registration form...");
         form.submit();
         } catch (err) {
             console.error("Registration error:", err);

@@ -416,6 +416,25 @@ document.addEventListener("DOMContentLoaded", () => {
     const loadBtn = document.getElementById("load-key-btn");
     if (loadBtn) loadBtn.addEventListener("click", importPrivateKeyFromFile);
 
-    commitPendingKey();
+    // Immediately attempt to commit pending identity
+    console.log("[Vault] Checking for pending identity to commit...");
+    commitPendingKey().catch(err => {
+        console.error("[Vault] Error committing pending identity:", err);
+    });
+
+    // Also ensure identity is loaded for authenticated users
+    const uuidMeta = document.querySelector('meta[name="user-uuid"]');
+    if (uuidMeta) {
+        console.log("[Vault] User authenticated with UUID:", uuidMeta.content);
+        getIdentity().then(identity => {
+            if (identity) {
+                console.log("[Vault] Cryptographic identity successfully loaded from IndexedDB");
+            } else {
+                console.warn("[Vault] No identity found in IndexedDB for UUID:", uuidMeta.content);
+            }
+        }).catch(err => {
+            console.error("[Vault] Error loading identity:", err);
+        });
+    }
 });
 
