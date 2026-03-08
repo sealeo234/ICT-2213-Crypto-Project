@@ -23,6 +23,7 @@ The server also maintains a table of registered users, their password hashes and
 	- From another machine: Find the server's IP address and use `http://<server_ip>:5000`
 	  - On Linux: `ip addr show` (look for eth0 or similar interface)
 	  - On Windows: `ipconfig` (look for the network adapter IP)
+	  - Accept the self-signed certificate warning in your browser
 
 ## Technicals
 
