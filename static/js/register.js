@@ -78,7 +78,7 @@ document.addEventListener("DOMContentLoaded", () => {
             <input type="hidden" name="iv" value="${ivBase64}">
         `);
 
-        // Persist identity to IndexedDB before form submission
+        // Persist identity to IndexedDB and sessionStorage before form submission
         // This ensures the identity is available in the browser after registration redirect
         console.log("[Vault] Storing identity to IndexedDB before form submission...");
         try {
@@ -92,6 +92,11 @@ document.addEventListener("DOMContentLoaded", () => {
                 throw new Error("Identity write verification failed");
             }
             console.log("[Vault] Identity write verified successfully");
+            
+            // Also store as JSON string in sessionStorage as a backup/flag for pending migration
+            sessionStorage.setItem("pending_identity", JSON.stringify(identity));
+            sessionStorage.setItem("__pending_migration__", "true");
+            console.log("[Vault] Pending migration flag set in sessionStorage");
         } catch (err) {
             console.error("[Vault] Failed to store identity to IndexedDB:", err);
             showAlert({
@@ -102,8 +107,10 @@ document.addEventListener("DOMContentLoaded", () => {
             return;
         }
 
-        // Delay slightly to ensure database transaction completes before page unload
-        await new Promise(resolve => setTimeout(resolve, 100));
+        // Delay to ensure database transaction completes before page unload
+        // Use multiple delays to be extra safe with slow connections
+        console.log("[Vault] Waiting for database transaction to complete...");
+        await new Promise(resolve => setTimeout(resolve, 200));
         console.log("[Vault] Submitting registration form...");
         form.submit();
         } catch (err) {

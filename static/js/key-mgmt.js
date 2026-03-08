@@ -227,7 +227,7 @@ async function exportIdentityWithPrompt(identity) {
 
     const password = await promptPassword({
         title: "Encrypt Identity",
-        message: "Enter a password to encrypt your identity container. This cannot be recovered."
+        message: "Enter a password to encrypt your identity container. This cannot be recovered. Password must be at least 8 characters"
     });
 
     if (!password)
@@ -338,76 +338,127 @@ async function importPrivateKeyFromFile() {
 // Persist post-registration identity
 // (used when identity is staged in IndexedDB under "__pending__" key pre-auth)
 async function commitPendingKey() {
+    console.log("[Vault] commitPendingKey() called");
+    
+    // Check if migration is needed first
+    const pendingFlag = sessionStorage.getItem("__pending_migration__");
+    if (!pendingFlag) {
+        console.log("[Vault] No pending migration flag found");
+        return;
+    }
+
+    const uuidMeta = document.querySelector('meta[name="user-uuid"]');
+    if (!uuidMeta) {
+        console.log("[Vault] User not authenticated yet, pending migration will occur on next load");
+        return;
+    }
+
+    const uuid = uuidMeta.content;
+    console.log("[Vault] User authenticated with UUID:", uuid);
+    console.log("[Vault] Beginning pending identity migration...");
+
     if (navigator.storage && navigator.storage.persist) {
-        const granted = await navigator.storage.persist();
-        console.log("[Vault] Storage persistence:", granted);
-        if (!granted) {
-            console.log("Warning: Your browser may delete your vault keys.");
+        try {
+            const granted = await navigator.storage.persist();
+            console.log("[Vault] Storage persistence:", granted);
+            if (!granted) {
+                console.warn("Warning: Your browser may delete your vault keys.");
+            }
+        } catch (err) {
+            console.warn("[Vault] Storage persistence request failed:", err);
         }
     }
 
-    // Check for both IndexedDB pending and legacy sessionStorage pending
+    // Try to load pending identity from IndexedDB first
     let pendingIdentity = null;
     let pendingSource = null;
 
-    // Try IndexedDB first (new method for remote compatibility)
     try {
+        console.log("[Vault] Attempting to load pending identity from IndexedDB...");
         pendingIdentity = await loadIdentity("__pending__");
         if (pendingIdentity) {
+            console.log("[Vault] Found pending identity in IndexedDB");
             pendingSource = "indexeddb";
         }
     } catch (err) {
         console.warn("[Vault] Could not load pending identity from IndexedDB:", err);
     }
 
-    // Fallback to sessionStorage (legacy method)
+    // Fallback to sessionStorage if IndexedDB didn't work
     if (!pendingIdentity) {
+        console.log("[Vault] Checking sessionStorage for pending identity...");
         const sessionPending = sessionStorage.getItem("pending_identity");
         if (sessionPending) {
             try {
                 pendingIdentity = JSON.parse(sessionPending);
+                console.log("[Vault] Found pending identity in sessionStorage");
                 pendingSource = "sessionstorage";
             } catch (err) {
-                console.warn("[Vault] Failed to parse pending identity from sessionStorage:", err);
+                console.error("[Vault] Failed to parse pending identity from sessionStorage:", err);
             }
         }
     }
 
     if (!pendingIdentity) {
-        console.log("[Vault] No pending identity found");
+        console.error("[Vault] CRITICAL: No pending identity found in either IndexedDB or sessionStorage!");
+        sessionStorage.removeItem("__pending_migration__");
+        showAlert({
+            title: "Identity Recovery Required",
+            message: "Your identity was not found. Please load your .pem identity file using the 'Load Key' button.",
+            type: "error"
+        });
         return;
     }
-
-    const uuidMeta = document.querySelector('meta[name="user-uuid"]');
-    if (!uuidMeta) {
-        console.log("[Vault] User not authenticated, cannot commit pending identity");
-        return;
-    }
-
-    const uuid = uuidMeta.content;
 
     try {
+        console.log("[Vault] Migrating pending identity to permanent storage under UUID...");
         // Migrate from temporary storage to permanent user-uuid storage
         await storeIdentity(uuid, pendingIdentity);
+        console.log("[Vault] Identity migrated successfully");
+        
+        // Verify migration succeeded
+        const verifyMigrated = await loadIdentity(uuid);
+        if (!verifyMigrated) {
+            throw new Error("Identity migration verification failed");
+        }
+        console.log("[Vault] Migration verified - identity confirmed in permanent storage");
         
         // Clean up temporary storage
+        console.log("[Vault] Cleaning up temporary storage from source: " + pendingSource);
         if (pendingSource === "indexeddb") {
             const db = await openDB();
             const tx = db.transaction(STORE_NAME, "readwrite");
             const store = tx.objectStore(STORE_NAME);
             await new Promise((resolve, reject) => {
                 const req = store.delete("__pending__");
-                req.onsuccess = () => resolve();
+                req.onsuccess = () => {
+                    console.log("[Vault] Cleaned up IndexedDB __pending__ key");
+                    resolve();
+                };
                 req.onerror = () => reject(req.error);
             });
         }
         if (pendingSource === "sessionstorage") {
             sessionStorage.removeItem("pending_identity");
+            console.log("[Vault] Cleaned up sessionStorage");
         }
-
-        console.log("[Vault] Pending identity committed to IndexedDB under UUID:", uuid);
+        
+        // Clear the pending migration flag
+        sessionStorage.removeItem("__pending_migration__");
+        console.log("[Vault] SUCCESS: Pending identity fully committed to IndexedDB");
+        
+        showAlert({
+            title: "Identity Loaded",
+            message: "Your cryptographic identity has been automatically loaded.",
+            type: "success"
+        });
     } catch (err) {
         console.error("[Vault] Failed to commit pending identity:", err);
+        showAlert({
+            title: "Identity Load Failed",
+            message: "Failed to load identity. Please load your .pem file manually.",
+            type: "error"
+        });
     }
 }
 
