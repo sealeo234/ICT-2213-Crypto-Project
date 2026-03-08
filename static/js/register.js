@@ -12,27 +12,35 @@ document.addEventListener("DOMContentLoaded", () => {
     form.addEventListener("submit", async e => {
         e.preventDefault();
 
-        if (!checkCryptoSupport()) return;
+        try {
+            if (!checkCryptoSupport()) return;
 
-        const username = form.querySelector('input[name="username"]').value.trim();
-        if (!username) {
-            showAlert({ title: "Registration Error", message: "Please enter a username", type: "error" });
-            return;
-        }
+            const username = form.querySelector('input[name="username"]').value.trim();
+            if (!username) {
+                showAlert({ title: "Registration Error", message: "Please enter a username", type: "error" });
+                return;
+            }
 
-        const res = await fetch("/check_username", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ username })
-        });
+            console.log("Checking username:", username);
+            const res = await fetch("/check_username", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ username })
+            });
 
-        const data = await res.json();
-        if (!data.available) {
-            showAlert({ title: "Registration Error", message: "Username already exists. Choose another.", type: "error" });
-            return;
-        }
+            console.log("Response status:", res.status);
+            if (!res.ok) {
+                throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+            }
 
-        // Generate encryption/signing keypairs and convert to storable base64
+            const data = await res.json();
+            console.log("Response data:", data);
+            if (!data.available) {
+                showAlert({ title: "Registration Error", message: "Username already exists. Choose another.", type: "error" });
+                return;
+            }
+
+            // Generate encryption/signing keypairs and convert to storable base64
         const encPair = await generateEncryptionKeyPair();
         const signPair = await generateSigningKeyPair();
         const encPublicBase64 = await exportPublicKey(encPair.publicKey);
@@ -79,5 +87,9 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         form.submit();
+        } catch (err) {
+            console.error("Registration error:", err);
+            showAlert({ title: "Registration Error", message: err.message || "An unexpected error occurred", type: "error" });
+        }
     });
 });
