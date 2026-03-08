@@ -110,7 +110,7 @@ document.addEventListener("DOMContentLoaded", () => {
         // Delay to ensure database transaction completes before page unload
         // Use multiple delays to be extra safe with slow connections
         console.log("[Vault] Waiting for database transaction to complete...");
-        await new Promise(resolve => setTimeout(resolve, 200));
+        await new Promise(resolve => setTimeout(resolve, 500));
         console.log("[Vault] Submitting registration form...");
         form.submit();
         } catch (err) {
