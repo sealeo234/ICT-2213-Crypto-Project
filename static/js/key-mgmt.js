@@ -15,7 +15,16 @@ function handleError(err, title = "Error") {
 
 // Check for Web Crypto API support
 function checkCryptoSupport() {
-    return true; // Removed check for development
+    // Check if Web Crypto API is available
+    if (typeof crypto === 'undefined' || !crypto.subtle) {
+        showAlert({
+            title: "Browser Not Supported",
+            message: "Your browser does not support the Web Crypto API required for client-side encryption. Please use a modern browser like Chrome, Firefox, or Edge.",
+            type: "error"
+        });
+        return false;
+    }
+    return true;
 }
 
 // Alert modal renderer
