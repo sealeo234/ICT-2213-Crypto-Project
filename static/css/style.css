@@ -2,6 +2,7 @@
     Theme: Deep Space / Electric Blue
 */
 
+/* Load fonts with better error handling */
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap');
 
 :root {
@@ -32,13 +33,44 @@
 }
 
 body {
-    background: var(--bg-dark);
-    background-image: var(--bg-gradient);
-    color: var(--text-primary);
-    font-family: 'Inter', sans-serif;
+    background: var(--bg-dark) !important;
+    background-image: var(--bg-gradient) !important;
+    color: var(--text-primary) !important;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
     line-height: 1.6;
     min-height: 100vh;
     overflow-x: hidden;
+}
+
+/* Force dark theme for all elements */
+html, body, #content, main, section, div, p, h1, h2, h3, h4, h5, h6, span, a {
+    color: var(--text-primary) !important;
+}
+
+/* Ensure links are visible */
+a {
+    color: var(--accent-blue) !important;
+}
+
+a:hover {
+    color: var(--accent-blue-hover) !important;
+}
+
+/* Force dark backgrounds on all containers */
+.glass-card, nav, .container, .max-w-7xl, .grid, .col-span-12, .col-span-4, .col-span-8 {
+    background-color: transparent !important;
+}
+
+/* Ensure form elements have dark backgrounds */
+input, textarea, select {
+    background: rgba(15, 23, 42, 0.8) !important;
+    border: 1px solid var(--border-glass) !important;
+    color: var(--text-primary) !important;
+}
+
+input:focus, textarea:focus, select:focus {
+    border-color: var(--accent-blue) !important;
+    box-shadow: 0 0 0 2px var(--accent-blue-glow) !important;
 }
 
 /* --- Layout Components --- */
