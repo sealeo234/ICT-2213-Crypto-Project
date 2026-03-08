@@ -3,83 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="color-scheme" content="dark">
     <title>VaulnZero | Enterprise Encryption</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    
-    <!-- Critical CSS for Brave browser compatibility -->
-    <style>
-        /* Critical styles to ensure dark theme loads even if main CSS fails */
-        body {
-            background: #020617 !important;
-            background-image: radial-gradient(circle at 50% -20%, #1e293b 0%, #020617 100%) !important;
-            color: #f8fafc !important;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
-            min-height: 100vh !important;
-        }
-        
-        /* Ensure text remains visible */
-        * {
-            color: inherit !important;
-        }
-        
-        /* Dark theme fallbacks */
-        .glass-card {
-            background: rgba(15, 23, 42, 0.9) !important;
-            border: 1px solid rgba(255, 255, 255, 0.1) !important;
-            border-radius: 24px !important;
-            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5) !important;
-        }
-        
-        nav {
-            background: rgba(2, 6, 23, 0.95) !important;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
-        }
-    </style>
-    
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-    
-    <!-- Fallback font loading -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet" onload="this.onload=null;this.rel='stylesheet'">
-    <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap"></noscript>
-
-    <!-- JavaScript fallback for dark theme -->
-    <script>
-        // Ensure dark theme loads immediately, even if CSS is blocked
-        (function() {
-            var style = document.createElement('style');
-            style.textContent = `
-                body {
-                    background: #020617 !important;
-                    background-image: radial-gradient(circle at 50% -20%, #1e293b 0%, #020617 100%) !important;
-                    color: #f8fafc !important;
-                }
-                .glass-card {
-                    background: rgba(15, 23, 42, 0.9) !important;
-                    border: 1px solid rgba(255, 255, 255, 0.1) !important;
-                }
-                nav {
-                    background: rgba(2, 6, 23, 0.95) !important;
-                }
-            `;
-            document.head.appendChild(style);
-            
-            // Force dark theme on page load
-            document.addEventListener('DOMContentLoaded', function() {
-                document.body.style.background = '#020617';
-                document.body.style.backgroundImage = 'radial-gradient(circle at 50% -20%, #1e293b 0%, #020617 100%)';
-                document.body.style.color = '#f8fafc';
-            });
-        })();
-    </script>
 
     {% if current_user.is_authenticated %}
     <!-- UUID and public key for client-side encryption -->
     <meta name="user-uuid" content="{{ current_user.uuid }}">
     <meta name="user-public-key" content="{{ current_user.public_key }}">
     {% endif %}
+</head>
 </head>
 
 <body class="flex flex-col min-vh-100">
