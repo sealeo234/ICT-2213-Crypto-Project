@@ -12,6 +12,8 @@ document.addEventListener("DOMContentLoaded", () => {
     form.addEventListener("submit", async e => {
         e.preventDefault();
 
+        if (!checkCryptoSupport()) return;
+
         const username = form.querySelector('input[name="username"]').value.trim();
         if (!username) {
             showAlert({ title: "Registration Error", message: "Please enter a username", type: "error" });

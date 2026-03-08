@@ -13,6 +13,19 @@ function handleError(err, title = "Error") {
     showAlert({ title, message, type: "error" });
 }
 
+// Check for Web Crypto API support
+function checkCryptoSupport() {
+    if (typeof crypto === 'undefined' || !crypto.subtle) {
+        showAlert({
+            title: "Browser Not Supported",
+            message: "Your browser does not support the Web Crypto API required for client-side encryption. Please use a modern browser like Chrome, Firefox, or Edge.",
+            type: "error"
+        });
+        return false;
+    }
+    return true;
+}
+
 // Alert modal renderer
 function showAlert({ title = "Alert", message = "", type = "error" }) {
     const modal = document.getElementById("alert-modal");
@@ -26,6 +39,7 @@ function showAlert({ title = "Alert", message = "", type = "error" }) {
 }
 
 async function ensurePrivateKeyPresent() {
+    if (!checkCryptoSupport()) return false;
     const identity = await getIdentity();
     if (!identity || !identity.encPriv) {
         showAlert({
