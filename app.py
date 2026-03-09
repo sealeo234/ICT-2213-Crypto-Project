@@ -282,6 +282,9 @@ def update_file(file_id):
     file = request.files.get('file')
     if not file:
         return "No file", 400
+    
+    if file.filename != record.filename:
+        return f"Filename mismatch. Expected exactly '{record.filename}'", 400
 
     owner_dir = os.path.join(app.config['UPLOAD_FOLDER'], record.owner_uuid)
     path = os.path.join(owner_dir, record.filename)

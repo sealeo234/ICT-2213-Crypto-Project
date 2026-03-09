@@ -14,14 +14,23 @@ document.addEventListener("click", async e => {
     if (!(await ensurePrivateKeyPresent())) return;
 
     const fileId = link.dataset.updateFile;
+    const expectedFilename = link.dataset.filename;
 
-    // Create a hidden file input on the fly to prompt user for the new file
     const input = document.createElement("input");
     input.type = "file";
     
     input.onchange = async () => {
         const file = input.files[0];
         if (!file) return;
+
+        if (file.name !== expectedFilename) {
+            showAlert({ 
+                title: "Filename Mismatch", 
+                message: `You must upload a file named exactly "${expectedFilename}" to update this record.`, 
+                type: "error" 
+            });
+            return; // Abort the update process
+        }
 
         try {
             showAlert({ title: "Updating...", message: "Encrypting and signing new file version.", type: "success" });
