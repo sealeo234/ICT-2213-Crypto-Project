@@ -167,6 +167,12 @@
                                 Download
                             </a>
 
+                            <a href="/update/{{ file.id }}"
+                            data-update-file="{{ file.id }}"
+                            class="update-link text-purple-400 hover:text-purple-300">
+                                Update
+                            </a>
+
                             {% if file.owner_uuid == current_user.uuid %}
                             <a href="/delete/{{ file.id }}"
                             class="text-red-400 hover:text-red-300">

@@ -245,7 +245,6 @@ def upload_file():
     return redirect(url_for("index"))
 
 
-
 @app.route('/download/<int:file_id>')
 @login_required
 def download_file(file_id):
@@ -267,6 +266,40 @@ def download_file(file_id):
     owner_dir = os.path.join(app.config['UPLOAD_FOLDER'], record.owner_uuid)
     return send_from_directory(owner_dir, record.filename, as_attachment=True)
 
+
+@app.route('/update/<int:file_id>', methods=['POST'])
+@login_required
+def update_file(file_id):
+    record = VaultFile.query.get_or_404(file_id)
+
+    allowed = (
+        record.owner_uuid == current_user.uuid or
+        FileKey.query.filter_by(file_id=file_id, recipient_uuid=current_user.uuid).first()
+    )
+    if not allowed:
+        return "Forbidden", 403
+
+    file = request.files.get('file')
+    if not file:
+        return "No file", 400
+
+    owner_dir = os.path.join(app.config['UPLOAD_FOLDER'], record.owner_uuid)
+    path = os.path.join(owner_dir, record.filename)
+    
+    file.seek(0, os.SEEK_END)
+    size = file.tell()
+    file.seek(0)
+    file.save(path)
+
+    record.iv = request.form.get("iv")
+    record.signature = request.form.get("signature")
+    record.signature_alg = request.form.get("signature_alg")
+    record.signer_public_key = request.form.get("signer_public_key")
+    record.size = size
+
+    db.session.commit()
+    flash(f'Asset {record.filename} has been updated with a new version.')
+    return redirect(url_for('index'))
 
 
 @app.route('/file_iv/<int:file_id>')
@@ -308,7 +341,6 @@ def file_signature(file_id):
         "signature_alg": record.signature_alg,
         "signer_public_key": record.signer_public_key,
     }
-
 
 
 @app.route('/delete/<file_id>')
