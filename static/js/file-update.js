@@ -81,7 +81,7 @@ document.addEventListener("click", async e => {
             const resp = await fetch(`/update/${fileId}`, { method: "POST", body: formData });
             if (!resp.ok) throw new Error("Server rejected the file update.");
 
-            window.location.reload();
+            showAlert({ title: "Success", message: "File updated successfully!", type: "success", onClose: () => window.location.reload()});
 
         } catch (err) {
             console.error(err);

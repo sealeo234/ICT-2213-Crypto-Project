@@ -328,7 +328,7 @@ async function importPrivateKeyFromFile() {
                 });
                 return;
             }
-            showAlert({ title: "Success", message: "Identity container successfully loaded!", type: "success" });
+            showAlert({ title: "Success", message: "Identity container successfully loaded!", type: "success", onClose: () => window.location.reload()});
         } catch (err) {
             console.error(err);
             showAlert({ title: "Error", message: "Failed to store identity", type: "error" });
