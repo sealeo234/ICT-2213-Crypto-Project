@@ -2,7 +2,9 @@
     Theme: Deep Space / Electric Blue
 */
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap');
+/* @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap'); */
+
+
 
 :root {
     /* Color Palette */
@@ -35,7 +37,8 @@ body {
     background: var(--bg-dark);
     background-image: var(--bg-gradient);
     color: var(--text-primary);
-    font-family: 'Inter', sans-serif;
+    /* font-family: 'Inter', sans-serif; */
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
     line-height: 1.6;
     min-height: 100vh;
     overflow-x: hidden;
