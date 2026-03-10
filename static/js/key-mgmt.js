@@ -318,6 +318,31 @@ async function importPrivateKeyFromFile() {
             return showAlert({ title: "Unsupported File", message: "This PEM is not a supported identity container.", type: "error" });
         }
 
+        // Verify the private key matches the user's public key ---
+        try {
+            console.log("[Vault] Verifying private key against account public key...");
+            const pubKeyBase64 = document.querySelector('meta[name="user-public-key"]').content;
+            
+            // 1. Import the known public key and encrypt a test message
+            const pubKey = await importEncryptionPublicKey(pubKeyBase64);
+            const testMessage = new TextEncoder().encode("KeyMatchTest");
+            const encryptedChallenge = await crypto.subtle.encrypt({ name: "RSA-OAEP" }, pubKey, testMessage);
+            
+            // 2. Import the uploaded private key and attempt to decrypt
+            const privKey = await importEncryptionPrivateKey(identity.encPriv);
+            await crypto.subtle.decrypt({ name: "RSA-OAEP" }, privKey, encryptedChallenge);
+            
+            console.log("[Vault] Key verification passed!");
+        } catch (err) {
+            console.error("[Vault] Key verification failed:", err);
+            showAlert({ 
+                title: "Invalid Identity Container", 
+                message: "This key does not match your account. Please select the correct .pem file.", 
+                type: "error" 
+            });
+            return; // Stop the import process entirely
+        }
+        
         try {
             await storeIdentity(uuid, identity);
             if (!identity.signPriv) {
