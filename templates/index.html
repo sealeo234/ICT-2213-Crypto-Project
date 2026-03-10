@@ -177,14 +177,14 @@
                                 </a>
 
                                 {% if file.owner_uuid == current_user.uuid %}
-                                <a href="/edit_access/{{ file.id }}"
-                                class="text-yellow-400 hover:text-yellow-300 whitespace-nowrap font-medium transition">
-                                    Edit Access
-                                </a>
-
                                 <a href="/delete/{{ file.id }}"
                                 class="text-red-400 hover:text-red-300 whitespace-nowrap font-medium transition">
                                     Delete
+                                </a>
+
+                                <a href="/edit_access/{{ file.id }}"
+                                class="text-yellow-400 hover:text-yellow-300 whitespace-nowrap font-medium transition">
+                                    Edit Access
                                 </a>
                                 {% endif %}
 
