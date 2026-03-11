@@ -11,19 +11,22 @@ The server also maintains a table of registered users, their password hashes and
 ## Quick Setup
 
 1. Optional: Create and activate a virtual environment:
-	- Windows (PowerShell):
-	  - `python -m venv .venv`
-	  - `.\.venv\Scripts\Activate.ps1`
+   - Windows (PowerShell):
+     - `python -m venv .venv`
+     - `.\.venv\Scripts\Activate.ps1`
+   - Linux / macOS:
+     - `python3 -m venv .venv`
+     - `source .venv/bin/activate`
 2. Install dependencies:
-	- `pip install -r requirements.txt`
+   - `pip install -r requirements.txt`
 3. Run the application:
-	- `python app.py`
+   - `python app.py`
 4. Open in browser:
-	- Local: `https://127.0.0.1`
-	- From another machine: Find the server's IP address and use `https://<server_ip>`
-	  - On Linux: `ip addr show` (look for eth0 or similar interface)
-	  - On Windows: `ipconfig` (look for the network adapter IP)
-	  - Accept the self-signed certificate warning in your browser
+   - Local: `https://127.0.0.1`
+   - From another machine: Find the server's IP address and use `https://<server_ip>`
+     - On Linux: `ip addr show` (look for `eth0` or similar interface)
+     - On Windows: `ipconfig` (look for the network adapter IP)
+     - Accept the self-signed certificate warning in your browser
 
 ## Technicals
 
