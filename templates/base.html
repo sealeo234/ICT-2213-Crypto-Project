@@ -26,7 +26,7 @@
     <link rel="preload" href="{{ url_for('static', filename='css/style.css') }}" as="style" onerror="forceReloadOnFail('style.css')">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" onerror="forceReloadOnFail('style.css')">
     <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    
 
     {% if current_user.is_authenticated %}
     <!-- UUID and public key for client-side encryption -->
