@@ -22,6 +22,7 @@ app.config['SECRET_KEY'] = 'REDACTED'
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///users.db'
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
+app.config['PREFERRED_URL_SCHEME'] = 'https'
 
 db = SQLAlchemy(app)
 login_manager = LoginManager(app)
