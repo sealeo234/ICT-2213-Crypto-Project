@@ -5,26 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>VaulnZero | Enterprise Encryption</title>
 
-    <script>
-        function forceReloadOnFail(resourceName) {
-            // Use sessionStorage to prevent an infinite reload loop if the server is completely down
-            if (!sessionStorage.getItem('reloaded_once')) {
-                console.warn(resourceName + " failed to load. Forcing a hard reload...");
-                sessionStorage.setItem('reloaded_once', 'true');
-                window.location.reload(true); 
-            } else {
-                console.error("Critical failure: " + resourceName + " failed to load twice.");
-            }
-        }
-
-        // Clear the fail flag if the page completely finishes loading successfully
-        window.addEventListener('load', () => {
-            sessionStorage.removeItem('reloaded_once');
-        });
-    </script>
-
-    <link rel="preload" href="{{ url_for('static', filename='css/style.css') }}" as="style" onerror="forceReloadOnFail('style.css')">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" onerror="forceReloadOnFail('style.css')">
+    <link rel="preload" href="{{ url_for('static', filename='css/style.css') }}" as="style">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <script src="https://cdn.tailwindcss.com"></script>
     
 
@@ -129,14 +111,14 @@
 
 
 
-    <script src="{{ url_for('static', filename='js/crypto/fek.js') }}" onerror="forceReloadOnFail('fek.js')"></script>
-    <script src="{{ url_for('static', filename='js/crypto/key-wrapping.js') }}" onerror="forceReloadOnFail('key-wrapping.js')"></script>
-    <script src="{{ url_for('static', filename='js/crypto/ecdsa-sign.js') }}" onerror="forceReloadOnFail('ecdsa-sign.js')"></script>
-    <script src="{{ url_for('static', filename='js/key-mgmt.js') }}" onerror="forceReloadOnFail('key-mgmt.js')"></script>
-    <script src="{{ url_for('static', filename='js/upload.js') }}" onerror="forceReloadOnFail('upload.js')"></script>
-    <script src="{{ url_for('static', filename='js/download.js') }}" onerror="forceReloadOnFail('download.js')"></script>
-    <script src="{{ url_for('static', filename='js/access-update.js') }}" onerror="forceReloadOnFail('access-update.js')"></script>
-    <script src="{{ url_for('static', filename='js/key-rotate.js') }}" onerror="forceReloadOnFail('key-rotate.js')"></script>
-    <script src="{{ url_for('static', filename='js/file-update.js') }}" onerror="forceReloadOnFail('file-update.js')"></script>
+    <script src="{{ url_for('static', filename='js/crypto/fek.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/crypto/key-wrapping.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/crypto/ecdsa-sign.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/key-mgmt.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/upload.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/download.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/access-update.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/key-rotate.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/file-update.js') }}"></script>
 </body>
 </html>
