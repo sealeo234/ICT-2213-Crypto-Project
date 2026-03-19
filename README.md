@@ -40,6 +40,7 @@ The SQLite database (`users.db`) relies on three primary models:
 ### Prerequisites
 * Python 3.8+
 * A modern web browser with Web Crypto API support (Chrome, Firefox, Edge, Safari).
+* An Internet connection
 
 ### Installation Steps
 
