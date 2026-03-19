@@ -1,10 +1,7 @@
-/* ===============================
-    Registration Flow
-    - Username availability check
-    - Keypair generation
-    - Identity container export
-    - Initial key material submit
-================================ */
+/**
+ * @file register.js
+ * @description Registration workflow that provisions cryptographic identity and submits public key metadata.
+ */
 document.addEventListener("DOMContentLoaded", () => {
     const form = document.querySelector("form");
     if (!form) return;
@@ -38,7 +35,6 @@ document.addEventListener("DOMContentLoaded", () => {
                 return;
             }
 
-            // Generate encryption/signing keypairs and convert to storable base64
             const encPair = await generateEncryptionKeyPair();
             const signPair = await generateSigningKeyPair();
             const encPublicBase64 = await exportPublicKey(encPair.publicKey);
@@ -54,8 +50,8 @@ document.addEventListener("DOMContentLoaded", () => {
                 version: 1
             };
 
-            // Require local identity export before allowing registration to proceed
             try {
+                // Force user to export encrypted identity so recovery is possible before account creation.
                 await exportIdentityWithPrompt(identity);
             } catch (err) {
                 showAlert({
@@ -66,7 +62,6 @@ document.addEventListener("DOMContentLoaded", () => {
                 return;
             }
 
-            // Registration metadata IV expected by backend schema
             const iv = generateRandomBytes(16);
             const ivBase64 = arrayBufferToBase64(iv);
 
@@ -76,20 +71,17 @@ document.addEventListener("DOMContentLoaded", () => {
                 <input type="hidden" name="iv" value="${ivBase64}">
             `);
 
-            // Persist identity to IndexedDB and sessionStorage before form submission
-            // This ensures the identity is available in the browser after registration redirect
             try {
-                // Store to temp pending key in IndexedDB for auto-loading after registration
+                // Keep a pending copy before backend registration completes and UUID is finalized.
                 await storeIdentity("__pending__", identity);
                 
-                // Verify the write succeeded by attempting to read it back
                 const verifyIdentity = await loadIdentity("__pending__");
                 if (!verifyIdentity) {
                     throw new Error("Identity write verification failed");
                 }
                 
-                // Also store as JSON string in sessionStorage as a backup/flag for pending migration
                 sessionStorage.setItem("pending_identity", JSON.stringify(identity));
+                // Session fallback helps if IndexedDB write is delayed or blocked.
                 sessionStorage.setItem("__pending_migration__", "true");
                 console.log("[Vault] Pending migration flag set in sessionStorage");
             } catch (err) {
@@ -102,8 +94,8 @@ document.addEventListener("DOMContentLoaded", () => {
                 return;
             }
 
-            // Delay to ensure database transaction completes before page unload
             console.log("[Vault] Waiting for database transaction to complete...");
+            // Small delay reduces risk of racing form navigation with IndexedDB persistence.
             await new Promise(resolve => setTimeout(resolve, 200));
             console.log("[Vault] Submitting registration form...");
             form.submit();

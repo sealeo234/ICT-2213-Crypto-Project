@@ -1,16 +1,11 @@
-/* ===============================
-    Access Update Flow (Owner)
-    - Search for users to add
-    - Resolve selected recipients
-    - Recover FEK from owner wrapped key
-    - Rewrap FEK for new recipients
-    - Submit updated wrapped key map
-================================ */
+/**
+ * @file access-update.js
+ * @description Owner access-management flow for recipient search and FEK rewrapping.
+ */
 document.addEventListener("DOMContentLoaded", () => {
     const form = document.querySelector("form[data-edit-access]");
     if (!form) return;
 
-    // --- NEW: User Search Logic ---
     const searchBtn = document.getElementById("search-btn");
     const searchInput = document.getElementById("search-username");
     const container = document.getElementById("recipients-container");
@@ -27,7 +22,6 @@ document.addEventListener("DOMContentLoaded", () => {
             searchBtn.textContent = "Searching...";
 
             try {
-                // Expected backend endpoint: GET /search_user?username=XYZ
                 const res = await fetch(`/search_user?username=${encodeURIComponent(username)}`);
                 
                 if (!res.ok) {
@@ -37,15 +31,13 @@ document.addEventListener("DOMContentLoaded", () => {
                 
                 const user = await res.json();
 
-                // Prevent duplicates in the UI
+                // Avoid duplicate recipient entries in the editable list.
                 if (document.querySelector(`input[value="${user.uuid}"]`)) {
                     throw new Error("User is already in the access list.");
                 }
 
-                // Remove empty state text if present
                 if (emptyState) emptyState.remove();
 
-                // Append the new user to the form as a checked item
                 const userHtml = `
                     <label class="flex items-center justify-between p-4 rounded-xl bg-white/5 hover:bg-white/10 transition cursor-pointer animate-slide-up">
                         <div>
@@ -58,7 +50,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     </label>
                 `;
                 container.insertAdjacentHTML("beforeend", userHtml);
-                searchInput.value = ""; // Clear input on success
+                searchInput.value = "";
 
             } catch(err) {
                 searchError.textContent = err.message;
@@ -69,7 +61,6 @@ document.addEventListener("DOMContentLoaded", () => {
             }
         });
 
-        // Allow pressing Enter in the search bar
         searchInput.addEventListener("keypress", (e) => {
             if (e.key === "Enter") {
                 e.preventDefault();
@@ -78,7 +69,6 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
-    // --- Existing: Save Changes Logic ---
     form.addEventListener("submit", async e => {
         e.preventDefault();
         if (!(await ensurePrivateKeyPresent())) return;
@@ -87,28 +77,26 @@ document.addEventListener("DOMContentLoaded", () => {
             const fileId = form.dataset.fileId;
             const selfUUID = document.querySelector('meta[name="user-uuid"]').content;
 
-            // Ensure owner remains in access list
             let submittedRecipients = [...form.querySelectorAll("input[name='recipients']:checked")]
                 .map(cb => cb.value);
+            // Owner must always retain access, even if unchecked in UI by mistake.
             if (!submittedRecipients.includes(selfUUID)) submittedRecipients.push(selfUUID);
 
-            // Current wrapped FEKs indexed by recipient UUID
             const allKeysResp = await fetch(`/file_key/${fileId}?all=true`);
             const currentKeys = await allKeysResp.json();
 
-            // Recover raw FEK via owner's wrapped key
             const ownerWrappedKeyBase64 = currentKeys[selfUUID];
             const rawAes = await (async () => {
                 const identity = await getIdentity();
                 if (!identity || !identity.encPriv) throw new Error("Private key not found");
+                // Recover the canonical FEK from owner's wrapped key, then rewrap as needed.
                 return unwrapRawKeyFromBase64(identity.encPriv, ownerWrappedKeyBase64);
             })();
 
-            // Build outgoing wrapped key map, always preserving owner key
             const wrappedKeys = {};
             wrappedKeys[selfUUID] = ownerWrappedKeyBase64;
 
-            // Wrap FEK only for recipients newly added in this submission
+            // Wrap FEK only for newly-added recipients to avoid unnecessary cryptographic churn.
             const newRecipients = submittedRecipients.filter(uuid => !(uuid in currentKeys) && uuid !== selfUUID);
             if (newRecipients.length > 0) {
                 const pubKeyMap = await fetch("/recipient_keys", {
@@ -123,8 +111,8 @@ document.addEventListener("DOMContentLoaded", () => {
                 }
             }
 
-            // Preserve existing wrapped keys for unchanged recipients
             for (const uuid of submittedRecipients) {
+                // Preserve previously-issued wrapped keys for unchanged recipients.
                 if (!(uuid in wrappedKeys)) wrappedKeys[uuid] = currentKeys[uuid];
             }
 

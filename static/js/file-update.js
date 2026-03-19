@@ -1,11 +1,7 @@
-/* ===============================
-    Update/Modify Flow 
-    - Fetch existing wrapped FEK
-    - Unwrap FEK using local private key
-    - Encrypt new file with SAME FEK but NEW IV
-    - Sign new ciphertext
-    - Upload and overwrite on server
-================================ */
+/**
+ * @file file-update.js
+ * @description Secure in-place file update flow using existing FEK and fresh IV/signature metadata.
+ */
 document.addEventListener("click", async e => {
     const link = e.target.closest('a[data-update-file]');
     if (!link) return;
@@ -23,6 +19,7 @@ document.addEventListener("click", async e => {
         const file = input.files[0];
         if (!file) return;
 
+        // Enforce stable filename so updates map to the same logical record.
         if (file.name !== expectedFilename) {
             showAlert({ 
                 title: "Filename Mismatch", 
@@ -35,20 +32,18 @@ document.addEventListener("click", async e => {
         try {
             showAlert({ title: "Updating...", message: "Encrypting and signing new file version.", type: "success" });
 
-            // Fetch the user's wrapped key for this specific file
             const keyResp = await fetch(`/file_key/${fileId}`);
             if (!keyResp.ok) throw new Error("You do not have access to update this file.");
             const { wrapped_key } = await keyResp.json();
             const wrappedKeyBuf = base64ToArrayBuffer(wrapped_key);
 
-            // Load identity and unwrap the raw AES FEK
             const identity = await getIdentity();
             if (!identity || !identity.encPriv || !identity.signPriv) {
                 throw new Error("Full identity required to update files.");
             }
+            // Reuse the existing FEK for this file record and only rotate IV/ciphertext/signature.
             const rawAes = await unwrapRawKeyForOwner(identity.encPriv, wrappedKeyBuf);
 
-            // Import the unwrapped FEK for encryption
             const aesKey = await crypto.subtle.importKey(
                 "raw", 
                 rawAes, 
@@ -57,8 +52,8 @@ document.addEventListener("click", async e => {
                 ["encrypt"]
             );
 
-            // Encrypt the NEW file buffer with the existing key and a NEW IV
             const fileBuf = await file.arrayBuffer();
+            // Fresh IV per encryption is mandatory for AES-GCM security with the same key.
             const newIv = generateRandomBytes(12);
             const newCiphertext = await crypto.subtle.encrypt(
                 { name: "AES-GCM", iv: newIv }, 
@@ -66,11 +61,10 @@ document.addEventListener("click", async e => {
                 fileBuf
             );
 
-            // Sign the new (IV || Ciphertext) payload
+            // Sign IV || ciphertext so server-side metadata and blob stay cryptographically bound.
             const payload = concatBuffers(newIv.buffer, newCiphertext);
             const newSignature = await signPayloadWithIdentity(identity.signPriv, payload);
 
-            // Submit the updated artifact to the server
             const formData = new FormData();
             formData.append("file", new Blob([newCiphertext]), file.name);
             formData.append("iv", arrayBufferToBase64(newIv));
@@ -89,6 +83,5 @@ document.addEventListener("click", async e => {
         }
     };
 
-    // Trigger the file picker
     input.click();
 });

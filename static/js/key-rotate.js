@@ -1,10 +1,13 @@
-/* ===============================
-    Key Rotation Flow
-    - Generate new encryption/signing keypairs
-    - Rewrap per-file FEKs to new encryption key
-    - Update server with new public keys
-    - Persist and export new local identity
-================================ */
+/**
+ * @file key-rotate.js
+ * @description Key rotation workflow for generating new keys and rewrapping owned file keys.
+ */
+
+/**
+ * Rotates the current user's encryption and signing keys and rewraps accessible FEKs.
+ *
+ * @returns {Promise<void>}
+ */
 async function rotateVaultKey() {
     const uuidMeta = document.querySelector('meta[name="user-uuid"]');
     if (!uuidMeta) {
@@ -24,11 +27,9 @@ async function rotateVaultKey() {
     try {
         showAlert({ title: "Key Rotation", message: "Starting key rotation...", type: "success" });
 
-        // Load current local identity (source key used for FEK unwrap)
         const oldIdentity = await loadIdentity(uuid);
         if (!oldIdentity || !oldIdentity.encPriv) throw new Error("Old private key not found");
 
-        // Generate next encryption/signing keypairs
         const { publicKey: newEncPublicKey, privateKey: newEncPrivateKey } = await generateEncryptionKeyPair();
         const { publicKey: newSignPublicKey, privateKey: newSignPrivateKey } = await generateSigningKeyPair();
         const newEncPublicBase64 = await exportPublicKey(newEncPublicKey);
@@ -36,11 +37,11 @@ async function rotateVaultKey() {
         const newSignPublicBase64 = await exportPublicKey(newSignPublicKey);
         const newSignPrivateBase64 = await exportPrivateKey(newSignPrivateKey);
 
-        // Rewrap each accessible file's FEK from old key -> new encryption public key
         const fileIds = await fetch("/my_files").then(r => r.json());
 
         for (const fileId of fileIds) {
             try {
+                // Retrieve current user's wrapped FEK for each owned file.
                 const keyResp = await fetch(`/file_key/${fileId}`);
                 if (!keyResp.ok) continue;
 
@@ -51,6 +52,7 @@ async function rotateVaultKey() {
                 const rewrappedBuf = await wrapRawKeyWithPublicKey(newEncPublicKey, rawAes);
                 const newWrapped = arrayBufferToBase64(rewrappedBuf);
 
+                // Persist only this user's wrapped FEK replacement for the file.
                 await fetch(`/rewrap_self/${fileId}`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
@@ -60,7 +62,7 @@ async function rotateVaultKey() {
             } catch (err) {
                 console.error("Rewrap failed:", fileId, err);
 
-                // Stop rotation on first critical rewrap failure to avoid partial drift
+                // Fail fast: a decrypt mismatch here means old identity cannot safely rewrap remaining files.
                 showAlert({
                     title: "Invalid Private Key",
                     message: "The loaded private key cannot decrypt your files. Check your passphrase.",
@@ -71,19 +73,18 @@ async function rotateVaultKey() {
             }
         }
 
-        // Publish new public keys to backend profile
         const iv = generateRandomBytes(16);
         await fetch("/rotate_key", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
+                // Publish new public keys only after local rewrap loop succeeds.
                 public_key: newEncPublicBase64,
                 signing_public_key: newSignPublicBase64,
                 iv: arrayBufferToBase64(iv)
             })
         });
 
-        // Save and export refreshed local identity container
         const newIdentity = {
             encPriv: newEncPrivateBase64,
             signPriv: newSignPrivateBase64,
@@ -93,6 +94,7 @@ async function rotateVaultKey() {
         };
 
         await storeIdentity(uuid, newIdentity);
+        // Export immediately so user can recover this newly-rotated identity later.
         await exportIdentityWithPrompt(newIdentity);
 
         showAlert({

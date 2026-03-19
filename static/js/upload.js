@@ -1,10 +1,7 @@
-/* ===============================
-    Upload Flow (Owner)
-    - Encrypt file with FEK
-    - Wrap FEK for owner
-    - Sign encrypted payload
-    - Upload ciphertext + metadata
-================================ */
+/**
+ * @file upload.js
+ * @description Owner upload workflow for client-side encryption, FEK wrapping, signing, and metadata upload.
+ */
 document.addEventListener("DOMContentLoaded", () => {
     const uploadForm = document.getElementById("upload-form");
     const fileInput = document.getElementById("file-input");
@@ -13,8 +10,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (!uploadForm || !fileInput || !selectBtn) return;
 
-    // Drag and drop functionality
     if (dropzone) {
+        // Cancel browser default handling so dropped files stay in this controlled flow.
         ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
             dropzone.addEventListener(eventName, preventDefaults, false);
         });
@@ -46,6 +43,7 @@ document.addEventListener("DOMContentLoaded", () => {
             const dt = e.dataTransfer;
             const files = dt.files;
             if (files.length > 0) {
+                // Mirror native file picker behavior by assigning files to the hidden input.
                 fileInput.files = files;
                 uploadForm.requestSubmit();
             }
@@ -60,18 +58,16 @@ document.addEventListener("DOMContentLoaded", () => {
         const selfUUID = document.querySelector('meta[name="user-uuid"]').content;
 
         try {
-            // Encrypt selected file client-side
             const fileBuf = await file.arrayBuffer();
+            // Encrypt once with a fresh per-file FEK before any network request.
             const { iv, ciphertext, rawAes } = await encryptFileWithFek(fileBuf);
 
-            // Fetch owner public key for FEK wrapping
             const pubKeyMap = await fetch("/recipient_keys", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ recipients: [selfUUID] })
             }).then(r => r.json());
 
-            // Wrap FEK for owner access
             const wrappedKeys = {};
             const wrapped = await wrapRawKeyForRecipient(pubKeyMap[selfUUID], rawAes);
             wrappedKeys[selfUUID] = arrayBufferToBase64(wrapped);
@@ -81,11 +77,10 @@ document.addEventListener("DOMContentLoaded", () => {
                 throw new Error("Signing key missing. Load your identity container or rotate keys.");
             }
 
-            // Sign (IV || ciphertext) to provide authenticity
+            // Sign IV || ciphertext so IV substitution and ciphertext tampering are both detectable.
             const payload = concatBuffers(iv.buffer, ciphertext);
             const signature = await signPayloadWithIdentity(identity.signPriv, payload);
 
-            // Upload encrypted artifact and cryptographic metadata
             const formData = new FormData();
             formData.append("file", new Blob([ciphertext]), file.name);
             formData.append("iv", arrayBufferToBase64(iv));
@@ -94,6 +89,7 @@ document.addEventListener("DOMContentLoaded", () => {
             formData.append("signature_alg", "ECDSA_P256_SHA256");
             formData.append("signer_public_key", identity.signPub);
 
+            // Server stores encrypted blob and cryptographic metadata; plaintext never leaves browser.
             const resp = await fetch("/upload", { method: "POST", body: formData });
             if (!resp.ok) throw new Error("File upload failed");
 
@@ -105,7 +101,6 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     });
 
-    // UX: button opens native picker, change auto-submits upload form
     selectBtn.addEventListener("click", () => fileInput.click());
     fileInput.addEventListener("change", () => {
         if (fileInput.files.length > 0) uploadForm.requestSubmit();
